@@ -692,14 +692,14 @@ type ScreenerFormula struct {
 //	}
 //	result, err := client.Screener(ctx, req)
 func (c *Client) Screener(ctx context.Context, req ScreenerRequest) (map[string]interface{}, error) {
-	return c.post(ctx, "/v1/screener/live", req)
+	return c.post(ctx, "/v1/screener", req)
 }
 
 // ScreenerRaw runs the live screener with a raw request body (map, struct, or
 // any JSON-serializable value). Use this when you need full control over the
 // payload shape.
 func (c *Client) ScreenerRaw(ctx context.Context, body interface{}) (map[string]interface{}, error) {
-	return c.post(ctx, "/v1/screener/live", body)
+	return c.post(ctx, "/v1/screener", body)
 }
 
 // Health checks whether the API is operational. This endpoint is public and does

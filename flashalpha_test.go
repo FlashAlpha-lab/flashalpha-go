@@ -109,8 +109,8 @@ func TestScreenerEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Screener: unexpected error: %v", err)
 	}
-	if gotPath != "/v1/screener/live" {
-		t.Errorf("path = %q, want /v1/screener/live", gotPath)
+	if gotPath != "/v1/screener" {
+		t.Errorf("path = %q, want /v1/screener", gotPath)
 	}
 	if gotMethod != "POST" {
 		t.Errorf("method = %q, want POST", gotMethod)
