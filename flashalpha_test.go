@@ -3,6 +3,7 @@ package flashalpha_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -156,6 +157,320 @@ func TestScreenerWithFilters(t *testing.T) {
 	}
 	if !strings.Contains(gotBody, `"limit":20`) {
 		t.Errorf("body missing limit=20: %s", gotBody)
+	}
+}
+
+// newBodyCapturingServer records the body, method, and headers; returns a
+// configurable response status + body.
+func newBodyCapturingServer(t *testing.T, status int, respBody string) (*flashalpha.Client, *struct {
+	Method string
+	Path   string
+	Body   string
+	Header http.Header
+}) {
+	t.Helper()
+	cap := &struct {
+		Method string
+		Path   string
+		Body   string
+		Header http.Header
+	}{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cap.Method = r.Method
+		cap.Path = r.URL.Path
+		cap.Header = r.Header.Clone()
+		buf := new(strings.Builder)
+		_, _ = buf.ReadFrom(r.Body)
+		cap.Body = buf.String()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(respBody))
+	}))
+	t.Cleanup(srv.Close)
+	client := flashalpha.NewClientWithURL("test-key", srv.URL)
+	return client, cap
+}
+
+func TestScreenerContentTypeHeader(t *testing.T) {
+	client, cap := newBodyCapturingServer(t, 200, `{"meta":{},"data":[]}`)
+	_, err := client.Screener(context.Background(), flashalpha.ScreenerRequest{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cap.Header.Get("Content-Type") != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", cap.Header.Get("Content-Type"))
+	}
+	if cap.Header.Get("X-Api-Key") != "test-key" {
+		t.Errorf("X-Api-Key header missing")
+	}
+}
+
+func TestScreenerLeafFilter(t *testing.T) {
+	client, cap := newBodyCapturingServer(t, 200, `{"meta":{},"data":[]}`)
+	_, err := client.Screener(context.Background(), flashalpha.ScreenerRequest{
+		Filters: flashalpha.ScreenerLeaf{Field: "regime", Operator: "eq", Value: "positive_gamma"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(cap.Body, `"field":"regime"`) {
+		t.Errorf("body missing field: %s", cap.Body)
+	}
+	if !strings.Contains(cap.Body, `"operator":"eq"`) {
+		t.Errorf("body missing operator: %s", cap.Body)
+	}
+}
+
+func TestScreenerOrGroup(t *testing.T) {
+	client, cap := newBodyCapturingServer(t, 200, `{"meta":{},"data":[]}`)
+	_, err := client.Screener(context.Background(), flashalpha.ScreenerRequest{
+		Filters: flashalpha.ScreenerGroup{
+			Op: "or",
+			Conditions: []interface{}{
+				flashalpha.ScreenerLeaf{Field: "vrp_regime", Operator: "eq", Value: "toxic_short_vol"},
+				flashalpha.ScreenerLeaf{Field: "vrp_regime", Operator: "eq", Value: "event_only"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(cap.Body, `"op":"or"`) {
+		t.Errorf("body missing op=or: %s", cap.Body)
+	}
+	if !strings.Contains(cap.Body, "toxic_short_vol") {
+		t.Errorf("body missing toxic_short_vol: %s", cap.Body)
+	}
+}
+
+func TestScreenerNestedAndInsideOr(t *testing.T) {
+	client, cap := newBodyCapturingServer(t, 200, `{"meta":{},"data":[]}`)
+	_, err := client.Screener(context.Background(), flashalpha.ScreenerRequest{
+		Filters: flashalpha.ScreenerGroup{
+			Op: "or",
+			Conditions: []interface{}{
+				flashalpha.ScreenerGroup{
+					Op: "and",
+					Conditions: []interface{}{
+						flashalpha.ScreenerLeaf{Field: "regime", Operator: "eq", Value: "positive_gamma"},
+						flashalpha.ScreenerLeaf{Field: "harvest_score", Operator: "gte", Value: 70},
+					},
+				},
+				flashalpha.ScreenerGroup{
+					Op: "and",
+					Conditions: []interface{}{
+						flashalpha.ScreenerLeaf{Field: "regime", Operator: "eq", Value: "negative_gamma"},
+						flashalpha.ScreenerLeaf{Field: "atm_iv", Operator: "gte", Value: 50},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(cap.Body, `"op":"or"`) || !strings.Contains(cap.Body, `"op":"and"`) {
+		t.Errorf("body missing nested ops: %s", cap.Body)
+	}
+}
+
+func TestScreenerBetweenOperator(t *testing.T) {
+	client, cap := newBodyCapturingServer(t, 200, `{"meta":{},"data":[]}`)
+	_, err := client.Screener(context.Background(), flashalpha.ScreenerRequest{
+		Filters: flashalpha.ScreenerLeaf{
+			Field: "atm_iv", Operator: "between", Value: []int{15, 25},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(cap.Body, `"operator":"between"`) {
+		t.Errorf("body missing operator=between: %s", cap.Body)
+	}
+	if !strings.Contains(cap.Body, "[15,25]") {
+		t.Errorf("body missing [15,25]: %s", cap.Body)
+	}
+}
+
+func TestScreenerInOperator(t *testing.T) {
+	client, cap := newBodyCapturingServer(t, 200, `{"meta":{},"data":[]}`)
+	_, err := client.Screener(context.Background(), flashalpha.ScreenerRequest{
+		Filters: flashalpha.ScreenerLeaf{
+			Field: "term_state", Operator: "in", Value: []string{"contango", "mixed"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(cap.Body, `"operator":"in"`) || !strings.Contains(cap.Body, "contango") {
+		t.Errorf("body missing operator=in/contango: %s", cap.Body)
+	}
+}
+
+func TestScreenerIsNotNullOperator(t *testing.T) {
+	client, cap := newBodyCapturingServer(t, 200, `{"meta":{},"data":[]}`)
+	_, err := client.Screener(context.Background(), flashalpha.ScreenerRequest{
+		Filters: flashalpha.ScreenerLeaf{Field: "vrp_regime", Operator: "is_not_null"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(cap.Body, `"operator":"is_not_null"`) {
+		t.Errorf("body missing is_not_null: %s", cap.Body)
+	}
+	// Value should be omitted via omitempty
+	if strings.Contains(cap.Body, `"value"`) {
+		t.Errorf("body should not have value field for is_not_null: %s", cap.Body)
+	}
+}
+
+func TestScreenerCascadingFilters(t *testing.T) {
+	client, cap := newBodyCapturingServer(t, 200, `{"meta":{},"data":[]}`)
+	_, err := client.Screener(context.Background(), flashalpha.ScreenerRequest{
+		Filters: flashalpha.ScreenerGroup{
+			Op: "and",
+			Conditions: []interface{}{
+				flashalpha.ScreenerLeaf{Field: "regime", Operator: "eq", Value: "positive_gamma"},
+				flashalpha.ScreenerLeaf{Field: "expiries.days_to_expiry", Operator: "lte", Value: 14},
+				flashalpha.ScreenerLeaf{Field: "strikes.call_oi", Operator: "gte", Value: 2000},
+				flashalpha.ScreenerLeaf{Field: "contracts.type", Operator: "eq", Value: "C"},
+			},
+		},
+		Select: []string{"*"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, need := range []string{"expiries.days_to_expiry", "strikes.call_oi", "contracts.type"} {
+		if !strings.Contains(cap.Body, need) {
+			t.Errorf("body missing %s: %s", need, cap.Body)
+		}
+	}
+}
+
+func TestScreenerFormulas(t *testing.T) {
+	client, cap := newBodyCapturingServer(t, 200, `{"meta":{},"data":[]}`)
+	_, err := client.Screener(context.Background(), flashalpha.ScreenerRequest{
+		Formulas: []flashalpha.ScreenerFormula{
+			{Alias: "vrp_ratio", Expression: "atm_iv / rv_20d"},
+		},
+		Filters: flashalpha.ScreenerLeaf{Formula: "vrp_ratio", Operator: "gte", Value: 1.2},
+		Sort:    []flashalpha.ScreenerSort{{Formula: "vrp_ratio", Direction: "desc"}},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(cap.Body, `"alias":"vrp_ratio"`) {
+		t.Errorf("body missing alias: %s", cap.Body)
+	}
+	if !strings.Contains(cap.Body, `"formula":"vrp_ratio"`) {
+		t.Errorf("body missing formula ref: %s", cap.Body)
+	}
+}
+
+func TestScreenerMultiSort(t *testing.T) {
+	client, cap := newBodyCapturingServer(t, 200, `{"meta":{},"data":[]}`)
+	_, err := client.Screener(context.Background(), flashalpha.ScreenerRequest{
+		Sort: []flashalpha.ScreenerSort{
+			{Field: "dealer_flow_risk", Direction: "asc"},
+			{Field: "harvest_score", Direction: "desc"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(cap.Body, `"direction":"asc"`) || !strings.Contains(cap.Body, `"direction":"desc"`) {
+		t.Errorf("body missing multi-sort: %s", cap.Body)
+	}
+}
+
+func TestScreenerPagination(t *testing.T) {
+	client, cap := newBodyCapturingServer(t, 200, `{"meta":{},"data":[]}`)
+	limit, offset := 10, 10
+	_, err := client.Screener(context.Background(), flashalpha.ScreenerRequest{
+		Limit: &limit, Offset: &offset,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(cap.Body, `"limit":10`) || !strings.Contains(cap.Body, `"offset":10`) {
+		t.Errorf("body missing pagination: %s", cap.Body)
+	}
+}
+
+func TestScreenerNegativeNumber(t *testing.T) {
+	client, cap := newBodyCapturingServer(t, 200, `{"meta":{},"data":[]}`)
+	_, err := client.Screener(context.Background(), flashalpha.ScreenerRequest{
+		Filters: flashalpha.ScreenerLeaf{Field: "net_gex", Operator: "lt", Value: -500000},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(cap.Body, "-500000") {
+		t.Errorf("body missing -500000: %s", cap.Body)
+	}
+}
+
+func TestScreenerParsesResponse(t *testing.T) {
+	client, _ := newBodyCapturingServer(t, 200,
+		`{"meta":{"total_count":7,"tier":"alpha","universe_size":250},"data":[{"symbol":"SPY","price":656.01}]}`)
+	result, err := client.Screener(context.Background(), flashalpha.ScreenerRequest{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	meta := result["meta"].(map[string]interface{})
+	if meta["tier"] != "alpha" {
+		t.Errorf("tier = %v, want alpha", meta["tier"])
+	}
+	data := result["data"].([]interface{})
+	row := data[0].(map[string]interface{})
+	if row["symbol"] != "SPY" || row["price"].(float64) != 656.01 {
+		t.Errorf("row = %v", row)
+	}
+}
+
+func TestScreenerRaw(t *testing.T) {
+	client, cap := newBodyCapturingServer(t, 200, `{"meta":{},"data":[]}`)
+	_, err := client.ScreenerRaw(context.Background(), map[string]interface{}{
+		"limit":  5,
+		"select": []string{"symbol", "price"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(cap.Body, `"limit":5`) {
+		t.Errorf("body missing limit: %s", cap.Body)
+	}
+}
+
+func TestScreenerThrows400ValidationError(t *testing.T) {
+	client, _ := newBodyCapturingServer(t, 400,
+		`{"status":"ERROR","error":"validation_error","message":"Field 'harvest_score' requires the Alpha plan or higher."}`)
+	_, err := client.Screener(context.Background(), flashalpha.ScreenerRequest{
+		Filters: flashalpha.ScreenerLeaf{Field: "harvest_score", Operator: "gte", Value: 65},
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "Alpha") {
+		t.Errorf("expected error to mention Alpha: %v", err)
+	}
+}
+
+func TestScreenerThrows403TierRestricted(t *testing.T) {
+	client, _ := newBodyCapturingServer(t, 403,
+		`{"status":"ERROR","error":"tier_restricted","message":"Screener requires Growth plan.","current_plan":"Free","required_plan":"Growth"}`)
+	_, err := client.Screener(context.Background(), flashalpha.ScreenerRequest{})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	var tierErr *flashalpha.TierRestrictedError
+	if !errors.As(err, &tierErr) {
+		t.Errorf("expected TierRestrictedError, got %T: %v", err, err)
+		return
+	}
+	if tierErr.CurrentPlan != "Free" || tierErr.RequiredPlan != "Growth" {
+		t.Errorf("plans = %q / %q", tierErr.CurrentPlan, tierErr.RequiredPlan)
 	}
 }
 

@@ -194,6 +194,154 @@ func TestIntegrationVolatility(t *testing.T) {
 	t.Logf("Volatility response keys: %v", keys(got))
 }
 
+// ── Screener ─────────────────────────────────────────────────────────────────
+
+func TestIntegrationScreenerEmpty(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	got, err := client.Screener(ctx, flashalpha.ScreenerRequest{})
+	if err != nil {
+		t.Fatalf("Screener empty: %v", err)
+	}
+	if _, ok := got["meta"]; !ok {
+		t.Errorf("missing meta key")
+	}
+	if _, ok := got["data"]; !ok {
+		t.Errorf("missing data key")
+	}
+	meta := got["meta"].(map[string]interface{})
+	tier := meta["tier"].(string)
+	if tier != "growth" && tier != "alpha" {
+		t.Errorf("tier = %q, want growth or alpha", tier)
+	}
+}
+
+func TestIntegrationScreenerSimpleFilter(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	limit := 5
+	got, err := client.Screener(ctx, flashalpha.ScreenerRequest{
+		Filters: flashalpha.ScreenerLeaf{
+			Field:    "regime",
+			Operator: "in",
+			Value:    []string{"positive_gamma", "negative_gamma"},
+		},
+		Select: []string{"symbol", "regime", "price"},
+		Limit:  &limit,
+	})
+	if err != nil {
+		t.Fatalf("Screener filter: %v", err)
+	}
+	data := got["data"].([]interface{})
+	for _, row := range data {
+		r := row.(map[string]interface{})
+		regime := r["regime"].(string)
+		if regime != "positive_gamma" && regime != "negative_gamma" {
+			t.Errorf("unexpected regime: %s", regime)
+		}
+	}
+}
+
+func TestIntegrationScreenerAndGroupWithSort(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	limit := 5
+	got, err := client.Screener(ctx, flashalpha.ScreenerRequest{
+		Filters: flashalpha.ScreenerGroup{
+			Op: "and",
+			Conditions: []interface{}{
+				flashalpha.ScreenerLeaf{Field: "atm_iv", Operator: "gte", Value: 0},
+				flashalpha.ScreenerLeaf{Field: "atm_iv", Operator: "lte", Value: 500},
+			},
+		},
+		Sort:   []flashalpha.ScreenerSort{{Field: "atm_iv", Direction: "desc"}},
+		Select: []string{"symbol", "atm_iv"},
+		Limit:  &limit,
+	})
+	if err != nil {
+		t.Fatalf("Screener AND group: %v", err)
+	}
+	data := got["data"].([]interface{})
+	var prev *float64
+	for _, row := range data {
+		r := row.(map[string]interface{})
+		iv, ok := r["atm_iv"].(float64)
+		if !ok {
+			continue // nil
+		}
+		if prev != nil && iv > *prev {
+			t.Errorf("not sorted desc: %v > %v", iv, *prev)
+		}
+		prev = &iv
+	}
+}
+
+func TestIntegrationScreenerSelectStar(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	limit := 1
+	got, err := client.Screener(ctx, flashalpha.ScreenerRequest{
+		Select: []string{"*"},
+		Limit:  &limit,
+	})
+	if err != nil {
+		t.Fatalf("Screener select *: %v", err)
+	}
+	data := got["data"].([]interface{})
+	if len(data) > 0 {
+		row := data[0].(map[string]interface{})
+		if _, ok := row["symbol"]; !ok {
+			t.Errorf("missing symbol in full flat object")
+		}
+		if _, ok := row["price"]; !ok {
+			t.Errorf("missing price in full flat object")
+		}
+	}
+}
+
+func TestIntegrationScreenerLimitRespected(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	limit := 3
+	got, err := client.Screener(ctx, flashalpha.ScreenerRequest{Limit: &limit})
+	if err != nil {
+		t.Fatalf("Screener limit: %v", err)
+	}
+	meta := got["meta"].(map[string]interface{})
+	returned := int(meta["returned_count"].(float64))
+	if returned > 3 {
+		t.Errorf("returned_count = %d, want <= 3", returned)
+	}
+	if len(got["data"].([]interface{})) > 3 {
+		t.Errorf("data len > 3")
+	}
+}
+
+func TestIntegrationScreenerInvalidField(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	_, err := client.Screener(ctx, flashalpha.ScreenerRequest{
+		Filters: flashalpha.ScreenerLeaf{
+			Field: "not_a_real_field_xyz", Operator: "eq", Value: 1,
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid field")
+	}
+}
+
 // keys returns the top-level keys of a map for logging.
 func keys(m map[string]interface{}) []string {
 	ks := make([]string, 0, len(m))
