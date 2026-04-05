@@ -87,6 +87,78 @@ func TestAccount(t *testing.T) {
 	}
 }
 
+// ── Screener ──────────────────────────────────────────────────────────────────
+
+func TestScreenerEmpty(t *testing.T) {
+	var gotPath, gotMethod, gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		buf := new(strings.Builder)
+		_, _ = buf.ReadFrom(r.Body)
+		gotBody = buf.String()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte(`{"meta":{"tier":"growth"},"data":[]}`))
+	}))
+	t.Cleanup(srv.Close)
+	client := flashalpha.NewClientWithURL("test-key", srv.URL)
+
+	_, err := client.Screener(context.Background(), flashalpha.ScreenerRequest{})
+	if err != nil {
+		t.Fatalf("Screener: unexpected error: %v", err)
+	}
+	if gotPath != "/v1/screener/live" {
+		t.Errorf("path = %q, want /v1/screener/live", gotPath)
+	}
+	if gotMethod != "POST" {
+		t.Errorf("method = %q, want POST", gotMethod)
+	}
+	if gotBody != "{}" {
+		t.Errorf("body = %q, want {}", gotBody)
+	}
+}
+
+func TestScreenerWithFilters(t *testing.T) {
+	var gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		buf := new(strings.Builder)
+		_, _ = buf.ReadFrom(r.Body)
+		gotBody = buf.String()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"meta":{},"data":[]}`))
+	}))
+	t.Cleanup(srv.Close)
+	client := flashalpha.NewClientWithURL("test-key", srv.URL)
+
+	limit := 20
+	req := flashalpha.ScreenerRequest{
+		Filters: flashalpha.ScreenerGroup{
+			Op: "and",
+			Conditions: []interface{}{
+				flashalpha.ScreenerLeaf{Field: "regime", Operator: "eq", Value: "positive_gamma"},
+				flashalpha.ScreenerLeaf{Field: "harvest_score", Operator: "gte", Value: 65},
+			},
+		},
+		Sort:   []flashalpha.ScreenerSort{{Field: "harvest_score", Direction: "desc"}},
+		Select: []string{"symbol", "price", "harvest_score"},
+		Limit:  &limit,
+	}
+	_, err := client.Screener(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Screener: unexpected error: %v", err)
+	}
+	if !strings.Contains(gotBody, `"op":"and"`) {
+		t.Errorf("body missing op=and: %s", gotBody)
+	}
+	if !strings.Contains(gotBody, "positive_gamma") {
+		t.Errorf("body missing positive_gamma: %s", gotBody)
+	}
+	if !strings.Contains(gotBody, `"limit":20`) {
+		t.Errorf("body missing limit=20: %s", gotBody)
+	}
+}
+
 // ── Gex ───────────────────────────────────────────────────────────────────────
 
 func TestGex(t *testing.T) {

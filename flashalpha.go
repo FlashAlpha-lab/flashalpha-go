@@ -8,6 +8,7 @@
 package flashalpha
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -56,6 +57,36 @@ func (c *Client) get(ctx context.Context, path string, params url.Values) (map[s
 	}
 	req.Header.Set("X-Api-Key", c.apiKey)
 	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("flashalpha: request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	return c.handle(resp)
+}
+
+func (c *Client) post(ctx context.Context, path string, body interface{}) (map[string]interface{}, error) {
+	var reader io.Reader
+	if body != nil {
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("flashalpha: marshal body: %w", err)
+		}
+		reader = bytes.NewReader(jsonBody)
+	}
+
+	rawURL := c.baseURL + path
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, reader)
+	if err != nil {
+		return nil, fmt.Errorf("flashalpha: build request: %w", err)
+	}
+	req.Header.Set("X-Api-Key", c.apiKey)
+	req.Header.Set("Accept", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 
 	resp, err := c.http.Do(req)
 	if err != nil {
@@ -595,6 +626,80 @@ func (c *Client) Symbols(ctx context.Context) (map[string]interface{}, error) {
 // Account returns account information and quota usage.
 func (c *Client) Account(ctx context.Context) (map[string]interface{}, error) {
 	return c.get(ctx, "/v1/account", nil)
+}
+
+// ScreenerRequest is the request body for the live options screener. All fields
+// are optional — an empty request returns the default universe for your tier.
+//
+// See https://flashalpha.com/docs/lab-api-screener for the full field reference.
+type ScreenerRequest struct {
+	Filters  interface{}       `json:"filters,omitempty"`
+	Sort     []ScreenerSort    `json:"sort,omitempty"`
+	Select   []string          `json:"select,omitempty"`
+	Formulas []ScreenerFormula `json:"formulas,omitempty"`
+	Limit    *int              `json:"limit,omitempty"`
+	Offset   *int              `json:"offset,omitempty"`
+}
+
+// ScreenerLeaf is a leaf filter condition. Use Field xor Formula.
+type ScreenerLeaf struct {
+	Field    string      `json:"field,omitempty"`
+	Formula  string      `json:"formula,omitempty"`
+	Operator string      `json:"operator"`
+	Value    interface{} `json:"value,omitempty"`
+}
+
+// ScreenerGroup is an AND/OR filter group.
+type ScreenerGroup struct {
+	Op         string        `json:"op"`
+	Conditions []interface{} `json:"conditions"`
+}
+
+// ScreenerSort is a sort spec. Use Field xor Formula. Direction is "asc" or "desc".
+type ScreenerSort struct {
+	Field     string `json:"field,omitempty"`
+	Formula   string `json:"formula,omitempty"`
+	Direction string `json:"direction"`
+}
+
+// ScreenerFormula defines a computed field (Alpha tier only).
+type ScreenerFormula struct {
+	Alias      string `json:"alias"`
+	Expression string `json:"expression"`
+}
+
+// Screener runs the live options screener — filter and rank symbols by gamma
+// exposure, VRP, volatility, greeks, and more. Powered by an in-memory store
+// updated every 5-10s from live market data.
+//
+// Growth: 10-symbol universe, up to 10 rows. Alpha: ~250 symbols, up to 50
+// rows, formulas, and harvest/dealer-flow-risk scores.
+//
+// Example:
+//
+//	limit := 20
+//	req := flashalpha.ScreenerRequest{
+//	    Filters: flashalpha.ScreenerGroup{
+//	        Op: "and",
+//	        Conditions: []interface{}{
+//	            flashalpha.ScreenerLeaf{Field: "regime", Operator: "eq", Value: "positive_gamma"},
+//	            flashalpha.ScreenerLeaf{Field: "harvest_score", Operator: "gte", Value: 65},
+//	        },
+//	    },
+//	    Sort:   []flashalpha.ScreenerSort{{Field: "harvest_score", Direction: "desc"}},
+//	    Select: []string{"symbol", "price", "harvest_score", "dealer_flow_risk"},
+//	    Limit:  &limit,
+//	}
+//	result, err := client.Screener(ctx, req)
+func (c *Client) Screener(ctx context.Context, req ScreenerRequest) (map[string]interface{}, error) {
+	return c.post(ctx, "/v1/screener/live", req)
+}
+
+// ScreenerRaw runs the live screener with a raw request body (map, struct, or
+// any JSON-serializable value). Use this when you need full control over the
+// payload shape.
+func (c *Client) ScreenerRaw(ctx context.Context, body interface{}) (map[string]interface{}, error) {
+	return c.post(ctx, "/v1/screener/live", body)
 }
 
 // Health checks whether the API is operational. This endpoint is public and does
