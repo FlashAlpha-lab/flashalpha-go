@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -95,9 +96,8 @@ func TestScreenerEmpty(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
 		gotMethod = r.Method
-		buf := new(strings.Builder)
-		_, _ = buf.ReadFrom(r.Body)
-		gotBody = buf.String()
+		bodyBytes, _ := io.ReadAll(r.Body)
+		gotBody = string(bodyBytes)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
 		_, _ = w.Write([]byte(`{"meta":{"tier":"growth"},"data":[]}`))
@@ -123,9 +123,8 @@ func TestScreenerEmpty(t *testing.T) {
 func TestScreenerWithFilters(t *testing.T) {
 	var gotBody string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		buf := new(strings.Builder)
-		_, _ = buf.ReadFrom(r.Body)
-		gotBody = buf.String()
+		bodyBytes, _ := io.ReadAll(r.Body)
+		gotBody = string(bodyBytes)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"meta":{},"data":[]}`))
 	}))
@@ -179,9 +178,8 @@ func newBodyCapturingServer(t *testing.T, status int, respBody string) (*flashal
 		cap.Method = r.Method
 		cap.Path = r.URL.Path
 		cap.Header = r.Header.Clone()
-		buf := new(strings.Builder)
-		_, _ = buf.ReadFrom(r.Body)
-		cap.Body = buf.String()
+		bodyBytes, _ := io.ReadAll(r.Body)
+		cap.Body = string(bodyBytes)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
 		_, _ = w.Write([]byte(respBody))
@@ -868,7 +866,7 @@ func TestError401(t *testing.T) {
 		t.Fatal("expected error for 401, got nil")
 	}
 	var authErr *flashalpha.AuthenticationError
-	if !isType(err, &authErr) {
+	if !errors.As(err, &authErr) {
 		t.Errorf("expected *AuthenticationError, got %T: %v", err, err)
 	}
 }
@@ -902,7 +900,7 @@ func TestError404(t *testing.T) {
 		t.Fatal("expected error for 404, got nil")
 	}
 	var nfe *flashalpha.NotFoundError
-	if !isType(err, &nfe) {
+	if !errors.As(err, &nfe) {
 		t.Errorf("expected *NotFoundError, got %T: %v", err, err)
 	}
 }
@@ -937,19 +935,10 @@ func TestError500(t *testing.T) {
 		t.Fatal("expected error for 500, got nil")
 	}
 	var se *flashalpha.ServerError
-	if !isType(err, &se) {
+	if !errors.As(err, &se) {
 		t.Errorf("expected *ServerError, got %T: %v", err, err)
 	}
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-// isType checks whether err can be assigned to target (a pointer-to-pointer to
-// the desired concrete type). This avoids importing errors.As from Go 1.13.
-func isType[T any](err error, target **T) bool {
-	v, ok := err.(*T)
-	if ok {
-		*target = v
-	}
-	return ok
-}
