@@ -194,6 +194,64 @@ func TestIntegrationVolatility(t *testing.T) {
 	t.Logf("Volatility response keys: %v", keys(got))
 }
 
+// ── Max Pain ─────────────────────────────────────────────────────────────────
+
+func TestIntegrationMaxPain(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	got, err := client.MaxPain(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("MaxPain SPY: %v", err)
+	}
+	if _, ok := got["max_pain_strike"]; !ok {
+		t.Error("missing max_pain_strike")
+	}
+	if _, ok := got["pain_curve"]; !ok {
+		t.Error("missing pain_curve")
+	}
+	if _, ok := got["dealer_alignment"]; !ok {
+		t.Error("missing dealer_alignment")
+	}
+}
+
+func TestIntegrationMaxPainFieldStructure(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	got, err := client.MaxPain(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("MaxPain SPY: %v", err)
+	}
+	dist := got["distance"].(map[string]interface{})
+	dir := dist["direction"].(string)
+	if dir != "above" && dir != "below" && dir != "at" {
+		t.Errorf("direction = %q", dir)
+	}
+	signal := got["signal"].(string)
+	if signal != "bullish" && signal != "bearish" && signal != "neutral" {
+		t.Errorf("signal = %q", signal)
+	}
+}
+
+func TestIntegrationMaxPainMultiExpiry(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	got, err := client.MaxPain(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("MaxPain SPY: %v", err)
+	}
+	if cal, ok := got["max_pain_by_expiration"].([]interface{}); ok {
+		if len(cal) == 0 {
+			t.Error("max_pain_by_expiration is empty")
+		}
+	}
+}
+
 // ── Screener ─────────────────────────────────────────────────────────────────
 
 func TestIntegrationScreenerEmpty(t *testing.T) {

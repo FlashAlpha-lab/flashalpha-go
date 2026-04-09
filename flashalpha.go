@@ -628,6 +628,33 @@ func (c *Client) Account(ctx context.Context) (map[string]interface{}, error) {
 	return c.get(ctx, "/v1/account", nil)
 }
 
+// MaxPainOption configures the MaxPain request.
+type MaxPainOption func(*maxPainConfig)
+
+type maxPainConfig struct {
+	expiration string
+}
+
+// WithMaxPainExpiration filters max pain to a single expiry (YYYY-MM-DD).
+func WithMaxPainExpiration(exp string) MaxPainOption {
+	return func(c *maxPainConfig) { c.expiration = exp }
+}
+
+// MaxPain returns max pain analysis with dealer alignment, pain curve, OI
+// breakdown, expected move, pin probability, and multi-expiry calendar.
+// Requires Growth+ plan.
+func (c *Client) MaxPain(ctx context.Context, symbol string, opts ...MaxPainOption) (map[string]interface{}, error) {
+	cfg := &maxPainConfig{}
+	for _, o := range opts {
+		o(cfg)
+	}
+	params := url.Values{}
+	if cfg.expiration != "" {
+		params.Set("expiration", cfg.expiration)
+	}
+	return c.get(ctx, "/v1/maxpain/"+symbol, params)
+}
+
 // ScreenerRequest is the request body for the live options screener. All fields
 // are optional — an empty request returns the default universe for your tier.
 //

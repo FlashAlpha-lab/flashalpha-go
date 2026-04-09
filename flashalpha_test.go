@@ -89,6 +89,77 @@ func TestAccount(t *testing.T) {
 	}
 }
 
+// ── Max Pain ──────────────────────────────────────────────────────────────────
+
+func TestMaxPain(t *testing.T) {
+	_, client, cap := newCapturingServer(t, 200, map[string]interface{}{"max_pain_strike": 545})
+	_, err := client.MaxPain(context.Background(), "SPY")
+	if err != nil {
+		t.Fatalf("MaxPain: unexpected error: %v", err)
+	}
+	if cap.Path != "/v1/maxpain/SPY" {
+		t.Errorf("path = %q, want /v1/maxpain/SPY", cap.Path)
+	}
+}
+
+func TestMaxPainWithExpiration(t *testing.T) {
+	_, client, cap := newCapturingServer(t, 200, map[string]interface{}{})
+	_, err := client.MaxPain(context.Background(), "SPY", flashalpha.WithMaxPainExpiration("2026-04-17"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(cap.Query, "expiration=2026-04-17") {
+		t.Errorf("query = %q, want expiration param", cap.Query)
+	}
+}
+
+func TestMaxPainWithoutExpiration(t *testing.T) {
+	_, client, cap := newCapturingServer(t, 200, map[string]interface{}{})
+	_, err := client.MaxPain(context.Background(), "SPY")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(cap.Query, "expiration") {
+		t.Errorf("query should not contain expiration: %q", cap.Query)
+	}
+}
+
+func TestMaxPainParsesResponse(t *testing.T) {
+	_, client := newServer(t, 200, map[string]interface{}{
+		"max_pain_strike": float64(545),
+		"pin_probability": float64(68),
+		"dealer_alignment": map[string]interface{}{"alignment": "converging"},
+	})
+	result, err := client.MaxPain(context.Background(), "SPY")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result["max_pain_strike"].(float64) != 545 {
+		t.Errorf("max_pain_strike = %v", result["max_pain_strike"])
+	}
+	da := result["dealer_alignment"].(map[string]interface{})
+	if da["alignment"] != "converging" {
+		t.Errorf("alignment = %v", da["alignment"])
+	}
+}
+
+func TestMaxPainThrows403(t *testing.T) {
+	_, client := newServer(t, 403, map[string]interface{}{
+		"message": "Requires Growth.", "current_plan": "Free", "required_plan": "Growth",
+	})
+	_, err := client.MaxPain(context.Background(), "SPY")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	var tierErr *flashalpha.TierRestrictedError
+	if !errors.As(err, &tierErr) {
+		t.Fatalf("expected TierRestrictedError, got %T", err)
+	}
+	if tierErr.CurrentPlan != "Free" {
+		t.Errorf("CurrentPlan = %q", tierErr.CurrentPlan)
+	}
+}
+
 // ── Screener ──────────────────────────────────────────────────────────────────
 
 func TestScreenerEmpty(t *testing.T) {
