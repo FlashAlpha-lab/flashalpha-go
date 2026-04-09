@@ -113,6 +113,7 @@ All methods take `context.Context` as the first argument and return
 | `ExposureSummary(ctx, symbol)` | Full GEX/DEX/VEX/CHEX + hedging summary | Growth+ |
 | `Narrative(ctx, symbol)` | Verbal narrative analysis of exposure | Growth+ |
 | `ZeroDte(ctx, symbol, ...ZeroDteOption)` | 0DTE regime, expected move, pin risk | Growth+ |
+| `MaxPain(ctx, symbol, ...MaxPainOption)` | Max pain analysis with dealer alignment, pain curve, pin probability | Growth+ |
 | `ExposureHistory(ctx, symbol, ...HistoryOption)` | Daily exposure trend snapshots | Growth+ |
 
 ### Market Data
