@@ -146,6 +146,7 @@ All methods take `context.Context` as the first argument and return
 |---|---|---|
 | `Volatility(ctx, symbol)` | Comprehensive volatility analysis | Growth+ |
 | `AdvVolatility(ctx, symbol)` | SVI parameters, variance surface, arbitrage detection | Alpha+ |
+| `Vrp(ctx, symbol)` | Variance risk premium analytics — IV vs RV spread, gamma/vanna conditioning, strategy scores. Returns typed `*VrpResponse` with nested `Vrp.ZScore`, `Regime.NetGex`, `GexConditioned.HarvestScore`, `Directional.DownsideVrp`/`UpsideVrp`. | Alpha+ |
 
 ### Reference Data
 

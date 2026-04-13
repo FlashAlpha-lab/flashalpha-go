@@ -408,3 +408,422 @@ func keys(m map[string]interface{}) []string {
 	}
 	return ks
 }
+
+// ── Customer regression tests ────────────────────────────────────────────────
+//
+// Each test below replays one of the bugs an Alpha-tier user hit during
+// integration of an automated trading daemon. All tests call PUBLIC SDK
+// methods only — no raw HTTP, no unexported access, no mocks. The goal is
+// to lock in the SDK's exposed surface against regressions.
+
+// Issue #5 — SDK was missing Vrp(). The method now exists on the client.
+
+func TestVrp_ReturnsFullPayload(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	r, err := client.Vrp(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("Vrp SPY: %v", err)
+	}
+
+	// Top-level scalars
+	if r.Symbol != "SPY" {
+		t.Errorf("Symbol = %q, want SPY", r.Symbol)
+	}
+	if r.UnderlyingPrice <= 0 {
+		t.Errorf("UnderlyingPrice = %v, want > 0", r.UnderlyingPrice)
+	}
+	if r.AsOf == "" {
+		t.Error("AsOf is empty")
+	}
+	if r.NetHarvestScore == nil {
+		t.Error("NetHarvestScore is nil at top level")
+	}
+	if r.DealerFlowRisk == nil {
+		t.Error("DealerFlowRisk is nil at top level")
+	}
+
+	// Vrp core block
+	core := r.Vrp
+	if core.ZScore == nil {
+		t.Error("Vrp.ZScore is nil")
+	}
+	if core.Percentile == nil {
+		t.Error("Vrp.Percentile is nil")
+	} else if *core.Percentile < 0 || *core.Percentile > 100 {
+		t.Errorf("Vrp.Percentile = %d out of [0,100]", *core.Percentile)
+	}
+	if core.AtmIv == nil {
+		t.Error("Vrp.AtmIv is nil")
+	}
+	if core.Rv20d == nil {
+		t.Error("Vrp.Rv20d is nil")
+	}
+	if core.Vrp20d == nil {
+		t.Error("Vrp.Vrp20d is nil")
+	}
+
+	// Directional skew — canonical names; assert raw JSON tag presence
+	dir, ok := r.Raw["directional"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Raw.directional missing or wrong type")
+	}
+	for _, k := range []string{
+		"put_wing_iv_25d", "call_wing_iv_25d",
+		"downside_rv_20d", "upside_rv_20d",
+		"downside_vrp", "upside_vrp",
+	} {
+		if _, ok := dir[k]; !ok {
+			t.Errorf("directional.%s missing in raw payload", k)
+		}
+	}
+
+	// Regime block
+	switch r.Regime.Gamma {
+	case "positive_gamma", "negative_gamma", "neutral":
+	default:
+		t.Errorf("Regime.Gamma = %q unexpected", r.Regime.Gamma)
+	}
+
+	// Term VRP
+	if r.TermVrp == nil {
+		t.Error("TermVrp slice is nil")
+	}
+
+	// Gex-conditioned (nullable)
+	if r.GexConditioned != nil && r.GexConditioned.Regime == "" {
+		t.Error("GexConditioned.Regime empty")
+	}
+
+	// Strategy scores (nullable)
+	if r.StrategyScores != nil {
+		ss := r.StrategyScores
+		check := func(name string, v *int) {
+			if v != nil && (*v < 0 || *v > 100) {
+				t.Errorf("StrategyScores.%s = %d out of [0,100]", name, *v)
+			}
+		}
+		check("ShortPutSpread", ss.ShortPutSpread)
+		check("ShortStrangle", ss.ShortStrangle)
+		check("IronCondor", ss.IronCondor)
+		check("CalendarSpread", ss.CalendarSpread)
+	}
+}
+
+// Issue #1 — Nested response structures. The customer accessed
+// top-level keys that don't exist; data lives under sub-objects.
+
+func TestVrp_CoreMetrics_AreNested(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	r, err := client.Vrp(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("Vrp SPY: %v", err)
+	}
+	// Raw payload must NOT have these at the top level (customer trap).
+	for _, k := range []string{"z_score", "percentile", "atm_iv", "rv_20d", "vrp_20d"} {
+		if _, ok := r.Raw[k]; ok {
+			t.Errorf("raw[%q] present at top level — must be nested under 'vrp'", k)
+		}
+	}
+	// Typed access via the canonical nested path.
+	if r.Vrp.ZScore == nil {
+		t.Error("r.Vrp.ZScore is nil — should be populated for SPY")
+	}
+}
+
+func TestVrp_HarvestScore_UnderGexConditioned(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	r, err := client.Vrp(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("Vrp SPY: %v", err)
+	}
+	if _, ok := r.Raw["harvest_score"]; ok {
+		t.Error("raw.harvest_score present at top level — must live under gex_conditioned")
+	}
+	if r.GexConditioned != nil {
+		gc, ok := r.Raw["gex_conditioned"].(map[string]interface{})
+		if !ok {
+			t.Fatal("raw.gex_conditioned missing or wrong type")
+		}
+		for _, k := range []string{"harvest_score", "regime", "interpretation"} {
+			if _, ok := gc[k]; !ok {
+				t.Errorf("gex_conditioned.%s missing", k)
+			}
+		}
+	}
+}
+
+func TestVrp_NetGex_UnderRegime(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	r, err := client.Vrp(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("Vrp SPY: %v", err)
+	}
+	if _, ok := r.Raw["net_gex"]; ok {
+		t.Error("raw.net_gex present at top level on vrp payload — must be under regime")
+	}
+	if _, ok := r.Raw["gamma_flip"]; ok {
+		t.Error("raw.gamma_flip present at top level on vrp payload — must be under regime")
+	}
+	reg, ok := r.Raw["regime"].(map[string]interface{})
+	if !ok {
+		t.Fatal("raw.regime missing")
+	}
+	if _, ok := reg["net_gex"]; !ok {
+		t.Error("regime.net_gex missing")
+	}
+	if _, ok := reg["gamma"]; !ok {
+		t.Error("regime.gamma missing")
+	}
+}
+
+func TestVrp_CompositeScores_TopLevel(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	r, err := client.Vrp(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("Vrp SPY: %v", err)
+	}
+	if _, ok := r.Raw["net_harvest_score"]; !ok {
+		t.Error("raw.net_harvest_score missing — should be top-level")
+	}
+	if _, ok := r.Raw["dealer_flow_risk"]; !ok {
+		t.Error("raw.dealer_flow_risk missing — should be top-level")
+	}
+	if r.NetHarvestScore == nil {
+		t.Error("typed NetHarvestScore is nil")
+	}
+	if r.DealerFlowRisk == nil {
+		t.Error("typed DealerFlowRisk is nil")
+	}
+}
+
+func TestExposureSummary_NetGex_UnderExposures(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	r, err := client.ExposureSummary(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("ExposureSummary SPY: %v", err)
+	}
+	if sym, _ := r["symbol"].(string); sym != "SPY" {
+		t.Errorf("symbol = %q, want SPY", sym)
+	}
+	if _, ok := r["net_gex"]; ok {
+		t.Error("net_gex present at top level — must live under exposures")
+	}
+	exp, ok := r["exposures"].(map[string]interface{})
+	if !ok {
+		t.Fatal("exposures missing or wrong type")
+	}
+	if v, ok := exp["net_gex"]; !ok {
+		t.Error("exposures.net_gex missing")
+	} else if _, isNum := v.(float64); !isNum {
+		t.Errorf("exposures.net_gex not numeric: %T", v)
+	}
+	for _, k := range []string{"net_dex", "net_vex", "net_chex"} {
+		if v, ok := exp[k]; ok {
+			if _, isNum := v.(float64); !isNum {
+				t.Errorf("exposures.%s not numeric: %T", k, v)
+			}
+		}
+	}
+	regime, ok := r["regime"].(string)
+	if !ok {
+		t.Fatal("regime missing or not a string at top level")
+	}
+	switch regime {
+	case "positive_gamma", "negative_gamma", "neutral":
+	default:
+		t.Errorf("regime = %q unexpected", regime)
+	}
+}
+
+// Issue #2 — Field naming. downside_vrp / upside_vrp are canonical;
+// put_vrp / call_vrp are silent-null traps.
+
+func TestVrp_Directional_UsesDownsideUpsideNames(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	r, err := client.Vrp(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("Vrp SPY: %v", err)
+	}
+	d, ok := r.Raw["directional"].(map[string]interface{})
+	if !ok {
+		t.Fatal("raw.directional missing")
+	}
+	for _, k := range []string{
+		"downside_vrp", "upside_vrp",
+		"put_wing_iv_25d", "call_wing_iv_25d",
+	} {
+		if _, ok := d[k]; !ok {
+			t.Errorf("directional.%s missing", k)
+		}
+	}
+	for _, k := range []string{"put_vrp", "call_vrp"} {
+		if _, ok := d[k]; ok {
+			t.Errorf("directional.%s present — should NOT exist (use downside_vrp/upside_vrp)", k)
+		}
+	}
+}
+
+// Issue #3 — URL pattern mix. SDK methods route to canonical paths.
+
+func TestStockSummary_RoutesCorrectly(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	r, err := client.StockSummary(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("StockSummary SPY: %v", err)
+	}
+	if sym, _ := r["symbol"].(string); sym != "SPY" {
+		t.Errorf("symbol = %q, want SPY", sym)
+	}
+	if _, ok := r["price"]; !ok {
+		t.Error("price missing")
+	}
+	if len(r) < 4 {
+		t.Errorf("payload looks empty: %d keys", len(r))
+	}
+}
+
+func TestStockQuote_RoutesCorrectly(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	r, err := client.StockQuote(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("StockQuote SPY: %v", err)
+	}
+	if tk, _ := r["ticker"].(string); tk != "SPY" {
+		t.Errorf("ticker = %q, want SPY", tk)
+	}
+}
+
+func TestAllExposureMethods_RouteCorrectly(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	calls := map[string]func() (map[string]interface{}, error){
+		"Gex":             func() (map[string]interface{}, error) { return client.Gex(ctx, "SPY") },
+		"Dex":             func() (map[string]interface{}, error) { return client.Dex(ctx, "SPY") },
+		"Vex":             func() (map[string]interface{}, error) { return client.Vex(ctx, "SPY") },
+		"Chex":            func() (map[string]interface{}, error) { return client.Chex(ctx, "SPY") },
+		"ExposureSummary": func() (map[string]interface{}, error) { return client.ExposureSummary(ctx, "SPY") },
+		"ExposureLevels":  func() (map[string]interface{}, error) { return client.ExposureLevels(ctx, "SPY") },
+	}
+	for name, fn := range calls {
+		got, err := fn()
+		if err != nil {
+			t.Errorf("%s: %v", name, err)
+			continue
+		}
+		sym, _ := got["symbol"].(string)
+		if sym != "SPY" {
+			t.Errorf("%s: symbol = %q, want SPY", name, sym)
+		}
+	}
+}
+
+func TestVrp_MethodRoutesCorrectly(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	r, err := client.Vrp(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("Vrp SPY: %v", err)
+	}
+	if r.Symbol != "SPY" {
+		t.Errorf("symbol = %q, want SPY", r.Symbol)
+	}
+}
+
+// Issue #4 — Screener URL is /v1/screener (renamed v0.3.1).
+
+func TestScreener_ReturnsValidEnvelope(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	limit := 5
+	r, err := client.Screener(ctx, flashalpha.ScreenerRequest{Limit: &limit})
+	if err != nil {
+		t.Fatalf("Screener: %v", err)
+	}
+	meta, ok := r["meta"].(map[string]interface{})
+	if !ok {
+		t.Fatal("meta missing or wrong type")
+	}
+	for _, k := range []string{"total_count", "returned_count", "universe_size", "tier", "as_of"} {
+		if _, ok := meta[k]; !ok {
+			t.Errorf("meta.%s missing", k)
+		}
+	}
+	returned, ok := meta["returned_count"].(float64)
+	if !ok {
+		t.Fatal("meta.returned_count not numeric")
+	}
+	if int(returned) > limit {
+		t.Errorf("returned_count = %d > limit %d", int(returned), limit)
+	}
+	tier, _ := meta["tier"].(string)
+	if tier != "growth" && tier != "alpha" {
+		t.Errorf("tier = %q, want growth or alpha", tier)
+	}
+	if _, ok := r["data"]; !ok {
+		t.Error("data missing")
+	}
+}
+
+func TestScreener_FullRow_Readable(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	limit := 1
+	r, err := client.Screener(ctx, flashalpha.ScreenerRequest{
+		Select: []string{"*"},
+		Limit:  &limit,
+	})
+	if err != nil {
+		t.Fatalf("Screener select *: %v", err)
+	}
+	data, ok := r["data"].([]interface{})
+	if !ok {
+		t.Fatal("data missing or wrong type")
+	}
+	if len(data) == 0 {
+		t.Skip("no rows returned for universe")
+	}
+	row, ok := data[0].(map[string]interface{})
+	if !ok {
+		t.Fatal("row not an object")
+	}
+	for _, k := range []string{"symbol", "price", "regime"} {
+		if _, ok := row[k]; !ok {
+			t.Errorf("row missing %q", k)
+		}
+	}
+}

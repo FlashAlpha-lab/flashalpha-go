@@ -734,3 +734,156 @@ func (c *Client) ScreenerRaw(ctx context.Context, body interface{}) (map[string]
 func (c *Client) Health(ctx context.Context) (map[string]interface{}, error) {
 	return c.get(ctx, "/health", nil)
 }
+
+// ── VRP (Variance Risk Premium) ───────────────────────────────────────────────
+
+// VrpCore holds the core variance-risk-premium metrics under response.vrp.
+//
+// Customers must access these via the nested path (e.g. resp.Vrp.ZScore) —
+// the fields are NOT promoted to the top level.
+type VrpCore struct {
+	AtmIv       *float64 `json:"atm_iv"`
+	Rv5d        *float64 `json:"rv_5d"`
+	Rv10d       *float64 `json:"rv_10d"`
+	Rv20d       *float64 `json:"rv_20d"`
+	Rv30d       *float64 `json:"rv_30d"`
+	Vrp5d       *float64 `json:"vrp_5d"`
+	Vrp10d      *float64 `json:"vrp_10d"`
+	Vrp20d      *float64 `json:"vrp_20d"`
+	Vrp30d      *float64 `json:"vrp_30d"`
+	ZScore      *float64 `json:"z_score"`
+	Percentile  *int     `json:"percentile"`
+	HistoryDays int      `json:"history_days"`
+}
+
+// VrpDirectional holds put/call wing IV and downside/upside skew metrics.
+//
+// Canonical names are DownsideVrp / UpsideVrp — NOT put_vrp / call_vrp
+// (a common naming trap from other APIs).
+type VrpDirectional struct {
+	PutWingIv25d  *float64 `json:"put_wing_iv_25d"`
+	CallWingIv25d *float64 `json:"call_wing_iv_25d"`
+	DownsideRv20d *float64 `json:"downside_rv_20d"`
+	UpsideRv20d   *float64 `json:"upside_rv_20d"`
+	DownsideVrp   *float64 `json:"downside_vrp"`
+	UpsideVrp     *float64 `json:"upside_vrp"`
+}
+
+// VrpTermPoint is one point in the term-structure curve (response.term_vrp[]).
+type VrpTermPoint struct {
+	Dte int     `json:"dte"`
+	Iv  float64 `json:"iv"`
+	Rv  float64 `json:"rv"`
+	Vrp float64 `json:"vrp"`
+}
+
+// VrpGexConditioned holds gamma-regime-conditioned harvest scoring under
+// response.gex_conditioned (nullable).
+type VrpGexConditioned struct {
+	Regime         string  `json:"regime"`
+	HarvestScore   float64 `json:"harvest_score"`
+	Interpretation string  `json:"interpretation"`
+}
+
+// VrpVannaConditioned holds vanna-regime-conditioned outlook under
+// response.vanna_conditioned (nullable).
+type VrpVannaConditioned struct {
+	Outlook        string `json:"outlook"`
+	Interpretation string `json:"interpretation"`
+}
+
+// VrpRegime is the regime snapshot under response.regime. NetGex and
+// GammaFlip live HERE — not at the top level (a customer trap).
+type VrpRegime struct {
+	Gamma     string   `json:"gamma"`
+	VrpRegime *string  `json:"vrp_regime"`
+	NetGex    float64  `json:"net_gex"`
+	GammaFlip *float64 `json:"gamma_flip"`
+}
+
+// VrpStrategyScores holds 0–100 scores per strategy under
+// response.strategy_scores (nullable).
+type VrpStrategyScores struct {
+	ShortPutSpread *int `json:"short_put_spread"`
+	ShortStrangle  *int `json:"short_strangle"`
+	IronCondor     *int `json:"iron_condor"`
+	CalendarSpread *int `json:"calendar_spread"`
+}
+
+// VrpMacro is the macro context block under response.macro (nullable).
+type VrpMacro struct {
+	Vix          *float64 `json:"vix"`
+	Vix3m        *float64 `json:"vix_3m"`
+	VixTermSlope *float64 `json:"vix_term_slope"`
+	Dgs10        *float64 `json:"dgs10"`
+	HySpread     *float64 `json:"hy_spread"`
+	FedFunds     *float64 `json:"fed_funds"`
+}
+
+// VrpResponse is the full payload from GET /v1/vrp/{symbol}.
+//
+// Nested access paths (these are the canonical, only paths — fields are NOT
+// duplicated at the top level):
+//
+//   - resp.Vrp.ZScore, .Percentile, .AtmIv, .Rv20d, .Vrp20d (core metrics)
+//   - resp.Directional.DownsideVrp, .UpsideVrp (NOT put_vrp/call_vrp)
+//   - resp.Regime.NetGex, .Gamma, .GammaFlip (NOT top-level)
+//   - resp.GexConditioned.HarvestScore, .Regime, .Interpretation (nullable)
+//   - resp.StrategyScores.ShortPutSpread, .ShortStrangle, ... (nullable)
+//   - resp.TermVrp[i].Dte, .Iv, .Rv, .Vrp
+//   - resp.Macro.Vix, .Vix3m, ... (nullable)
+//
+// Top-level composite scores (the only top-level VRP scalars):
+// resp.NetHarvestScore and resp.DealerFlowRisk.
+//
+// Raw holds the underlying decoded JSON for any field not modeled above.
+type VrpResponse struct {
+	Symbol           string                 `json:"symbol"`
+	UnderlyingPrice  float64                `json:"underlying_price"`
+	AsOf             string                 `json:"as_of"`
+	MarketOpen       bool                   `json:"market_open"`
+	Vrp              VrpCore                `json:"vrp"`
+	VarianceRiskPrem *float64               `json:"variance_risk_premium"`
+	ConvexityPremium *float64               `json:"convexity_premium"`
+	FairVol          *float64               `json:"fair_vol"`
+	Directional      VrpDirectional         `json:"directional"`
+	TermVrp          []VrpTermPoint         `json:"term_vrp"`
+	GexConditioned   *VrpGexConditioned     `json:"gex_conditioned"`
+	VannaConditioned *VrpVannaConditioned   `json:"vanna_conditioned"`
+	Regime           VrpRegime              `json:"regime"`
+	StrategyScores   *VrpStrategyScores     `json:"strategy_scores"`
+	NetHarvestScore  *float64               `json:"net_harvest_score"`
+	DealerFlowRisk   *float64               `json:"dealer_flow_risk"`
+	Warnings         []string               `json:"warnings"`
+	Macro            *VrpMacro              `json:"macro"`
+	Raw              map[string]interface{} `json:"-"`
+}
+
+// Vrp returns variance-risk-premium analytics — the implied-vs-realized vol
+// spread, conditioned on dealer gamma and vanna regime, plus strategy scores
+// for harvesting. Requires Alpha+ plan.
+//
+// The response is nested. Common access paths:
+//
+//   - resp.Vrp.ZScore           (NOT a top-level field)
+//   - resp.Regime.NetGex        (NOT resp.NetGex)
+//   - resp.GexConditioned.HarvestScore  (NOT resp.HarvestScore)
+//   - resp.Directional.DownsideVrp / .UpsideVrp  (NOT put_vrp/call_vrp)
+//
+// Top-level composite scores: resp.NetHarvestScore, resp.DealerFlowRisk.
+func (c *Client) Vrp(ctx context.Context, symbol string) (*VrpResponse, error) {
+	raw, err := c.get(ctx, "/v1/vrp/"+symbol, nil)
+	if err != nil {
+		return nil, err
+	}
+	buf, err := json.Marshal(raw)
+	if err != nil {
+		return nil, fmt.Errorf("flashalpha: re-encode vrp: %w", err)
+	}
+	out := &VrpResponse{}
+	if err := json.Unmarshal(buf, out); err != nil {
+		return nil, fmt.Errorf("flashalpha: decode vrp: %w", err)
+	}
+	out.Raw = raw
+	return out, nil
+}
