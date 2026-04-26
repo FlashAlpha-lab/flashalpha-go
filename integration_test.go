@@ -196,6 +196,256 @@ func TestIntegrationVolatility(t *testing.T) {
 
 // ── Zero-DTE ─────────────────────────────────────────────────────────────────
 
+// Comprehensive end-to-end test of ZeroDteTyped. Every typed pointer field
+// is asserted non-nil so a renamed json struct tag would surface immediately.
+// The full untyped-shape coverage lives in TestIntegrationZeroDte_AllNewFields;
+// this is the typed mirror.
+func TestIntegrationZeroDteTyped_DeserializesAllFields(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	r, err := client.ZeroDteTyped(ctx, "SPX")
+	if err != nil {
+		t.Fatalf("ZeroDteTyped SPX: %v", err)
+	}
+	if r.Symbol != "SPX" {
+		t.Errorf("Symbol = %q, want SPX", r.Symbol)
+	}
+	if r.NoZeroDte {
+		if r.NextZeroDteExpiry == nil {
+			t.Error("NoZeroDte=true but NextZeroDteExpiry nil")
+		}
+		return
+	}
+
+	checkNotNil := func(field string, v interface{}) {
+		t.Helper()
+		// Use reflect-free check — pointer-typed fields are typed nil
+		// but compare equal to nil only when the interface is empty.
+		switch p := v.(type) {
+		case *float64:
+			if p == nil {
+				t.Errorf("%s nil", field)
+			}
+		case *int:
+			if p == nil {
+				t.Errorf("%s nil", field)
+			}
+		case *int64:
+			if p == nil {
+				t.Errorf("%s nil", field)
+			}
+		case *string:
+			if p == nil {
+				t.Errorf("%s nil", field)
+			}
+		case string:
+			if p == "" {
+				t.Errorf("%s empty", field)
+			}
+		}
+	}
+
+	// top-level
+	checkNotNil("UnderlyingPrice", r.UnderlyingPrice)
+	checkNotNil("AsOf", r.AsOf)
+
+	// regime
+	if r.Regime == nil {
+		t.Fatal("Regime nil")
+	}
+	checkNotNil("Regime.Label", r.Regime.Label)
+	checkNotNil("Regime.GammaFlip", r.Regime.GammaFlip)
+	checkNotNil("Regime.SpotVsFlip", r.Regime.SpotVsFlip)
+	checkNotNil("Regime.SpotToFlipPct", r.Regime.SpotToFlipPct)
+	checkNotNil("Regime.DistanceToFlipDollars", r.Regime.DistanceToFlipDollars)
+	checkNotNil("Regime.DistanceToFlipSigmas", r.Regime.DistanceToFlipSigmas)
+
+	// exposures
+	if r.Exposures == nil {
+		t.Fatal("Exposures nil")
+	}
+	checkNotNil("Exposures.NetGex", r.Exposures.NetGex)
+	checkNotNil("Exposures.NetDex", r.Exposures.NetDex)
+	checkNotNil("Exposures.NetVex", r.Exposures.NetVex)
+	checkNotNil("Exposures.NetChex", r.Exposures.NetChex)
+	checkNotNil("Exposures.PctOfTotalGex", r.Exposures.PctOfTotalGex)
+	checkNotNil("Exposures.TotalChainNetGex", r.Exposures.TotalChainNetGex)
+
+	// expected_move
+	if r.ExpectedMove == nil {
+		t.Fatal("ExpectedMove nil")
+	}
+	checkNotNil("ExpectedMove.Implied1SdDollars", r.ExpectedMove.Implied1SdDollars)
+	checkNotNil("ExpectedMove.Implied1SdPct", r.ExpectedMove.Implied1SdPct)
+	checkNotNil("ExpectedMove.UpperBound", r.ExpectedMove.UpperBound)
+	checkNotNil("ExpectedMove.LowerBound", r.ExpectedMove.LowerBound)
+	checkNotNil("ExpectedMove.StraddlePrice", r.ExpectedMove.StraddlePrice)
+	checkNotNil("ExpectedMove.AtmIv", r.ExpectedMove.AtmIv)
+
+	// pin_risk
+	if r.PinRisk == nil {
+		t.Fatal("PinRisk nil")
+	}
+	checkNotNil("PinRisk.MagnetStrike", r.PinRisk.MagnetStrike)
+	checkNotNil("PinRisk.MagnetGex", r.PinRisk.MagnetGex)
+	checkNotNil("PinRisk.DistanceToMagnetPct", r.PinRisk.DistanceToMagnetPct)
+	checkNotNil("PinRisk.PinScore", r.PinRisk.PinScore)
+	if r.PinRisk.Components == nil {
+		t.Fatal("PinRisk.Components nil")
+	}
+	checkNotNil("PinRisk.Components.OiScore", r.PinRisk.Components.OiScore)
+	checkNotNil("PinRisk.Components.ProximityScore", r.PinRisk.Components.ProximityScore)
+	checkNotNil("PinRisk.Components.TimeScore", r.PinRisk.Components.TimeScore)
+	checkNotNil("PinRisk.Components.GammaScore", r.PinRisk.Components.GammaScore)
+	checkNotNil("PinRisk.MaxPain", r.PinRisk.MaxPain)
+	checkNotNil("PinRisk.OiConcentrationTop3Pct", r.PinRisk.OiConcentrationTop3Pct)
+
+	// hedging — all 8 buckets + convexity_at_spot
+	if r.Hedging == nil {
+		t.Fatal("Hedging nil")
+	}
+	type bucketCase struct {
+		name string
+		b    *flashalpha.ZeroDteHedgingBucket
+	}
+	for _, bc := range []bucketCase{
+		{"SpotUp10Bp", r.Hedging.SpotUp10Bp},
+		{"SpotDown10Bp", r.Hedging.SpotDown10Bp},
+		{"SpotUp25Bp", r.Hedging.SpotUp25Bp},
+		{"SpotDown25Bp", r.Hedging.SpotDown25Bp},
+		{"SpotUpHalfPct", r.Hedging.SpotUpHalfPct},
+		{"SpotDownHalfPct", r.Hedging.SpotDownHalfPct},
+		{"SpotUp1Pct", r.Hedging.SpotUp1Pct},
+		{"SpotDown1Pct", r.Hedging.SpotDown1Pct},
+	} {
+		if bc.b == nil {
+			t.Errorf("Hedging.%s nil", bc.name)
+			continue
+		}
+		checkNotNil("Hedging."+bc.name+".DealerSharesToTrade", bc.b.DealerSharesToTrade)
+		checkNotNil("Hedging."+bc.name+".Direction", bc.b.Direction)
+		checkNotNil("Hedging."+bc.name+".NotionalUsd", bc.b.NotionalUsd)
+	}
+	checkNotNil("Hedging.ConvexityAtSpot", r.Hedging.ConvexityAtSpot)
+
+	// decay
+	if r.Decay == nil {
+		t.Fatal("Decay nil")
+	}
+	checkNotNil("Decay.NetThetaDollars", r.Decay.NetThetaDollars)
+	checkNotNil("Decay.CharmRegime", r.Decay.CharmRegime)
+	checkNotNil("Decay.CharmDescription", r.Decay.CharmDescription)
+	checkNotNil("Decay.GammaAcceleration", r.Decay.GammaAcceleration)
+
+	// vol_context
+	if r.VolContext == nil {
+		t.Fatal("VolContext nil")
+	}
+	checkNotNil("VolContext.ZeroDteAtmIv", r.VolContext.ZeroDteAtmIv)
+	checkNotNil("VolContext.SevenDteAtmIv", r.VolContext.SevenDteAtmIv)
+	checkNotNil("VolContext.IvRatio0Dte7Dte", r.VolContext.IvRatio0Dte7Dte)
+	checkNotNil("VolContext.Vix", r.VolContext.Vix)
+	checkNotNil("VolContext.VannaExposure", r.VolContext.VannaExposure)
+	checkNotNil("VolContext.VannaInterpretation", r.VolContext.VannaInterpretation)
+
+	// flow
+	if r.Flow == nil {
+		t.Fatal("Flow nil")
+	}
+	checkNotNil("Flow.TotalVolume", r.Flow.TotalVolume)
+	checkNotNil("Flow.CallVolume", r.Flow.CallVolume)
+	checkNotNil("Flow.PutVolume", r.Flow.PutVolume)
+	checkNotNil("Flow.NetCallMinusPutVolume", r.Flow.NetCallMinusPutVolume)
+	checkNotNil("Flow.TotalOi", r.Flow.TotalOi)
+	checkNotNil("Flow.CallOi", r.Flow.CallOi)
+	checkNotNil("Flow.PutOi", r.Flow.PutOi)
+	checkNotNil("Flow.PcRatioVolume", r.Flow.PcRatioVolume)
+	checkNotNil("Flow.PcRatioOi", r.Flow.PcRatioOi)
+	checkNotNil("Flow.VolumeToOiRatio", r.Flow.VolumeToOiRatio)
+	checkNotNil("Flow.AtmVolumeSharePct", r.Flow.AtmVolumeSharePct)
+	checkNotNil("Flow.Top3StrikeVolumePct", r.Flow.Top3StrikeVolumePct)
+
+	// levels
+	if r.Levels == nil {
+		t.Fatal("Levels nil")
+	}
+	checkNotNil("Levels.CallWall", r.Levels.CallWall)
+	checkNotNil("Levels.CallWallGex", r.Levels.CallWallGex)
+	checkNotNil("Levels.CallWallStrength", r.Levels.CallWallStrength)
+	checkNotNil("Levels.DistanceToCallWallPct", r.Levels.DistanceToCallWallPct)
+	checkNotNil("Levels.PutWall", r.Levels.PutWall)
+	checkNotNil("Levels.PutWallGex", r.Levels.PutWallGex)
+	checkNotNil("Levels.PutWallStrength", r.Levels.PutWallStrength)
+	checkNotNil("Levels.DistanceToPutWallPct", r.Levels.DistanceToPutWallPct)
+	checkNotNil("Levels.DistanceToMagnetDollars", r.Levels.DistanceToMagnetDollars)
+	checkNotNil("Levels.HighestOiStrike", r.Levels.HighestOiStrike)
+	checkNotNil("Levels.HighestOiTotal", r.Levels.HighestOiTotal)
+	checkNotNil("Levels.MaxPositiveGamma", r.Levels.MaxPositiveGamma)
+	checkNotNil("Levels.MaxNegativeGamma", r.Levels.MaxNegativeGamma)
+	checkNotNil("Levels.LevelClusterScore", r.Levels.LevelClusterScore)
+
+	// liquidity
+	if r.Liquidity == nil {
+		t.Fatal("Liquidity nil")
+	}
+	checkNotNil("Liquidity.AtmSpreadPct", r.Liquidity.AtmSpreadPct)
+	checkNotNil("Liquidity.WeightedSpreadPct", r.Liquidity.WeightedSpreadPct)
+	checkNotNil("Liquidity.ExecutionScore", r.Liquidity.ExecutionScore)
+
+	// metadata
+	if r.Metadata == nil {
+		t.Fatal("Metadata nil")
+	}
+	checkNotNil("Metadata.SnapshotAgeSeconds", r.Metadata.SnapshotAgeSeconds)
+	checkNotNil("Metadata.ChainContractCount", r.Metadata.ChainContractCount)
+	checkNotNil("Metadata.DataQualityScore", r.Metadata.DataQualityScore)
+	checkNotNil("Metadata.GreekSmoothnessScore", r.Metadata.GreekSmoothnessScore)
+
+	// strikes[0] — every per-strike field
+	if len(r.Strikes) > 0 {
+		s := r.Strikes[0]
+		if s.Strike <= 0 {
+			t.Error("strikes[0].Strike unpopulated")
+		}
+		checkNotNil("strikes[0].DistanceFromSpotPct", s.DistanceFromSpotPct)
+		checkNotNil("strikes[0].CallSymbol", s.CallSymbol)
+		checkNotNil("strikes[0].PutSymbol", s.PutSymbol)
+		checkNotNil("strikes[0].CallGex", s.CallGex)
+		checkNotNil("strikes[0].PutGex", s.PutGex)
+		checkNotNil("strikes[0].NetGex", s.NetGex)
+		checkNotNil("strikes[0].CallDex", s.CallDex)
+		checkNotNil("strikes[0].PutDex", s.PutDex)
+		checkNotNil("strikes[0].NetDex", s.NetDex)
+		checkNotNil("strikes[0].NetVex", s.NetVex)
+		checkNotNil("strikes[0].NetChex", s.NetChex)
+		checkNotNil("strikes[0].CallOi", s.CallOi)
+		checkNotNil("strikes[0].PutOi", s.PutOi)
+		checkNotNil("strikes[0].CallVolume", s.CallVolume)
+		checkNotNil("strikes[0].PutVolume", s.PutVolume)
+		checkNotNil("strikes[0].GexSharePct", s.GexSharePct)
+		checkNotNil("strikes[0].OiSharePct", s.OiSharePct)
+		checkNotNil("strikes[0].VolumeSharePct", s.VolumeSharePct)
+		checkNotNil("strikes[0].CallIv", s.CallIv)
+		checkNotNil("strikes[0].PutIv", s.PutIv)
+		checkNotNil("strikes[0].CallDelta", s.CallDelta)
+		checkNotNil("strikes[0].PutDelta", s.PutDelta)
+		checkNotNil("strikes[0].CallGamma", s.CallGamma)
+		checkNotNil("strikes[0].PutGamma", s.PutGamma)
+		checkNotNil("strikes[0].CallTheta", s.CallTheta)
+		checkNotNil("strikes[0].PutTheta", s.PutTheta)
+		checkNotNil("strikes[0].CallMid", s.CallMid)
+		checkNotNil("strikes[0].PutMid", s.PutMid)
+		checkNotNil("strikes[0].CallSpreadPct", s.CallSpreadPct)
+		checkNotNil("strikes[0].PutSpreadPct", s.PutSpreadPct)
+	}
+	// Raw fallback should always be populated for forward-compatibility.
+	if r.Raw == nil {
+		t.Error("Raw map nil — should hold full decoded payload")
+	}
+}
+
 // Validate the full 0DTE response shape — fine-grained hedging buckets,
 // distance-to-flip in dollars/sigmas, pin sub-scores, flow concentration,
 // wall strength + level cluster, the new liquidity & metadata sections,
