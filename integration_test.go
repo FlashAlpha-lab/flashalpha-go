@@ -194,6 +194,150 @@ func TestIntegrationVolatility(t *testing.T) {
 	t.Logf("Volatility response keys: %v", keys(got))
 }
 
+// ── Zero-DTE ─────────────────────────────────────────────────────────────────
+
+// Validate the full 0DTE response shape — fine-grained hedging buckets,
+// distance-to-flip in dollars/sigmas, pin sub-scores, flow concentration,
+// wall strength + level cluster, the new liquidity & metadata sections,
+// and per-strike greeks/quotes. Uses SPX which has daily 0DTE.
+func TestIntegrationZeroDte_AllNewFields(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	r, err := client.ZeroDte(ctx, "SPX")
+	if err != nil {
+		t.Fatalf("ZeroDte SPX: %v", err)
+	}
+	if sym, _ := r["symbol"].(string); sym != "SPX" {
+		t.Errorf("symbol = %q, want SPX", sym)
+	}
+	if v, ok := r["no_zero_dte"].(bool); ok && v {
+		if _, ok := r["next_zero_dte_expiry"]; !ok {
+			t.Error("no_zero_dte=true but next_zero_dte_expiry missing")
+		}
+		return
+	}
+
+	mustObj := func(parent map[string]interface{}, key string) map[string]interface{} {
+		t.Helper()
+		v, ok := parent[key].(map[string]interface{})
+		if !ok {
+			t.Fatalf("%s missing or not an object", key)
+		}
+		return v
+	}
+	checkKeys := func(obj map[string]interface{}, prefix string, keys []string) {
+		t.Helper()
+		for _, k := range keys {
+			if _, ok := obj[k]; !ok {
+				t.Errorf("%s.%s missing", prefix, k)
+			}
+		}
+	}
+
+	checkKeys(r, "(top-level)",
+		[]string{"underlying_price", "expiration", "as_of", "market_open",
+			"time_to_close_hours", "time_to_close_pct"})
+
+	checkKeys(mustObj(r, "regime"), "regime",
+		[]string{"label", "description", "gamma_flip", "spot_vs_flip", "spot_to_flip_pct",
+			"distance_to_flip_dollars", "distance_to_flip_sigmas"})
+
+	checkKeys(mustObj(r, "exposures"), "exposures",
+		[]string{"net_gex", "net_dex", "net_vex", "net_chex",
+			"pct_of_total_gex", "total_chain_net_gex"})
+
+	checkKeys(mustObj(r, "expected_move"), "expected_move",
+		[]string{"implied_1sd_dollars", "implied_1sd_pct", "remaining_1sd_dollars",
+			"remaining_1sd_pct", "upper_bound", "lower_bound",
+			"straddle_price", "atm_iv"})
+
+	pr := mustObj(r, "pin_risk")
+	checkKeys(pr, "pin_risk",
+		[]string{"magnet_strike", "magnet_gex", "distance_to_magnet_pct",
+			"pin_score", "components", "max_pain",
+			"oi_concentration_top3_pct", "description"})
+	checkKeys(mustObj(pr, "components"), "pin_risk.components",
+		[]string{"oi_score", "proximity_score", "time_score", "gamma_score"})
+
+	hedging := mustObj(r, "hedging")
+	for _, bucket := range []string{
+		"spot_up_10bp", "spot_down_10bp",
+		"spot_up_25bp", "spot_down_25bp",
+		"spot_up_half_pct", "spot_down_half_pct",
+		"spot_up_1pct", "spot_down_1pct",
+	} {
+		b, ok := hedging[bucket].(map[string]interface{})
+		if !ok {
+			t.Errorf("hedging.%s missing or not an object", bucket)
+			continue
+		}
+		checkKeys(b, "hedging."+bucket,
+			[]string{"dealer_shares_to_trade", "direction", "notional_usd"})
+	}
+	if _, ok := hedging["convexity_at_spot"]; !ok {
+		t.Error("hedging.convexity_at_spot missing")
+	}
+
+	checkKeys(mustObj(r, "decay"), "decay",
+		[]string{"net_theta_dollars", "theta_per_hour_remaining", "charm_regime",
+			"charm_description", "gamma_acceleration", "description"})
+
+	checkKeys(mustObj(r, "vol_context"), "vol_context",
+		[]string{"zero_dte_atm_iv", "seven_dte_atm_iv", "iv_ratio_0dte_7dte",
+			"vix", "vanna_exposure", "vanna_interpretation", "description"})
+
+	checkKeys(mustObj(r, "flow"), "flow",
+		[]string{"total_volume", "call_volume", "put_volume",
+			"net_call_minus_put_volume",
+			"total_oi", "call_oi", "put_oi",
+			"pc_ratio_volume", "pc_ratio_oi", "volume_to_oi_ratio",
+			"atm_volume_share_pct", "top3_strike_volume_pct"})
+
+	checkKeys(mustObj(r, "levels"), "levels",
+		[]string{"call_wall", "call_wall_gex", "call_wall_strength",
+			"distance_to_call_wall_pct",
+			"put_wall", "put_wall_gex", "put_wall_strength",
+			"distance_to_put_wall_pct",
+			"distance_to_magnet_dollars",
+			"highest_oi_strike", "highest_oi_total",
+			"max_positive_gamma", "max_negative_gamma",
+			"level_cluster_score"})
+
+	checkKeys(mustObj(r, "liquidity"), "liquidity",
+		[]string{"atm_spread_pct", "weighted_spread_pct", "execution_score"})
+
+	checkKeys(mustObj(r, "metadata"), "metadata",
+		[]string{"snapshot_age_seconds", "chain_contract_count",
+			"data_quality_score", "greek_smoothness_score"})
+
+	strikes, ok := r["strikes"].([]interface{})
+	if !ok {
+		t.Fatal("strikes missing or not an array")
+	}
+	if len(strikes) > 0 {
+		s, ok := strikes[0].(map[string]interface{})
+		if !ok {
+			t.Fatal("strikes[0] not an object")
+		}
+		checkKeys(s, "strikes[0]",
+			[]string{"strike", "distance_from_spot_pct",
+				"call_symbol", "put_symbol",
+				"call_gex", "put_gex", "net_gex",
+				"call_dex", "put_dex", "net_dex",
+				"net_vex", "net_chex",
+				"call_oi", "put_oi", "call_volume", "put_volume",
+				"gex_share_pct", "oi_share_pct", "volume_share_pct",
+				"call_iv", "put_iv",
+				"call_delta", "put_delta",
+				"call_gamma", "put_gamma",
+				"call_theta", "put_theta",
+				"call_mid", "put_mid",
+				"call_spread_pct", "put_spread_pct"})
+	}
+}
+
 // ── Max Pain ─────────────────────────────────────────────────────────────────
 
 func TestIntegrationMaxPain(t *testing.T) {
