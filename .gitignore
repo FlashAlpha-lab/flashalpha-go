@@ -1,3 +1,9 @@
+# Local tooling / secrets — never commit
+.claude/
+CLAUDE.md
+.env
+.env.*
+
 # Binaries
 *.exe
 *.exe~
