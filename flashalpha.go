@@ -22,6 +22,9 @@ import (
 const defaultBaseURL = "https://lab.flashalpha.com"
 const defaultTimeout = 30 * time.Second
 
+// seg URL-escapes a single path segment (e.g. a ticker) — escapes / ? % etc.
+func seg(s string) string { return url.PathEscape(s) }
+
 // Client is a thread-safe HTTP client for the FlashAlpha REST API.
 type Client struct {
 	apiKey  string
@@ -355,7 +358,7 @@ func (c *Client) Gex(ctx context.Context, symbol string, opts ...GexOption) (map
 	if cfg.minOI != nil {
 		params.Set("min_oi", strconv.Itoa(*cfg.minOI))
 	}
-	return c.get(ctx, "/v1/exposure/gex/"+symbol, params)
+	return c.get(ctx, "/v1/exposure/gex/"+seg(symbol), params)
 }
 
 // Dex returns delta exposure by strike for the given symbol.
@@ -369,7 +372,7 @@ func (c *Client) Dex(ctx context.Context, symbol string, opts ...DexOption) (map
 	if cfg.expiration != "" {
 		params.Set("expiration", cfg.expiration)
 	}
-	return c.get(ctx, "/v1/exposure/dex/"+symbol, params)
+	return c.get(ctx, "/v1/exposure/dex/"+seg(symbol), params)
 }
 
 // Vex returns vanna exposure by strike for the given symbol.
@@ -383,7 +386,7 @@ func (c *Client) Vex(ctx context.Context, symbol string, opts ...VexOption) (map
 	if cfg.expiration != "" {
 		params.Set("expiration", cfg.expiration)
 	}
-	return c.get(ctx, "/v1/exposure/vex/"+symbol, params)
+	return c.get(ctx, "/v1/exposure/vex/"+seg(symbol), params)
 }
 
 // Chex returns charm exposure by strike for the given symbol.
@@ -397,24 +400,24 @@ func (c *Client) Chex(ctx context.Context, symbol string, opts ...ChexOption) (m
 	if cfg.expiration != "" {
 		params.Set("expiration", cfg.expiration)
 	}
-	return c.get(ctx, "/v1/exposure/chex/"+symbol, params)
+	return c.get(ctx, "/v1/exposure/chex/"+seg(symbol), params)
 }
 
 // ExposureLevels returns key support/resistance levels derived from options exposure.
 func (c *Client) ExposureLevels(ctx context.Context, symbol string) (map[string]interface{}, error) {
-	return c.get(ctx, "/v1/exposure/levels/"+symbol, nil)
+	return c.get(ctx, "/v1/exposure/levels/"+seg(symbol), nil)
 }
 
 // ExposureSummary returns a full exposure summary (GEX/DEX/VEX/CHEX + hedging).
 // Requires Growth+ plan.
 func (c *Client) ExposureSummary(ctx context.Context, symbol string) (map[string]interface{}, error) {
-	return c.get(ctx, "/v1/exposure/summary/"+symbol, nil)
+	return c.get(ctx, "/v1/exposure/summary/"+seg(symbol), nil)
 }
 
 // Narrative returns a verbal narrative analysis of options exposure.
 // Requires Growth+ plan.
 func (c *Client) Narrative(ctx context.Context, symbol string) (map[string]interface{}, error) {
-	return c.get(ctx, "/v1/exposure/narrative/"+symbol, nil)
+	return c.get(ctx, "/v1/exposure/narrative/"+seg(symbol), nil)
 }
 
 // ZeroDte returns real-time 0DTE analytics: regime, expected move, pin risk, hedging, decay.
@@ -428,7 +431,7 @@ func (c *Client) ZeroDte(ctx context.Context, symbol string, opts ...ZeroDteOpti
 	if cfg.strikeRange != nil {
 		params.Set("strike_range", strconv.FormatFloat(*cfg.strikeRange, 'f', -1, 64))
 	}
-	return c.get(ctx, "/v1/exposure/zero-dte/"+symbol, params)
+	return c.get(ctx, "/v1/exposure/zero-dte/"+seg(symbol), params)
 }
 
 // ExposureHistory returns daily exposure snapshots for trend analysis.
@@ -442,14 +445,14 @@ func (c *Client) ExposureHistory(ctx context.Context, symbol string, opts ...His
 	if cfg.days != nil {
 		params.Set("days", strconv.Itoa(*cfg.days))
 	}
-	return c.get(ctx, "/v1/exposure/history/"+symbol, params)
+	return c.get(ctx, "/v1/exposure/history/"+seg(symbol), params)
 }
 
 // ── Market Data ───────────────────────────────────────────────────────────────
 
 // StockQuote returns a live stock quote (bid/ask/mid/last).
 func (c *Client) StockQuote(ctx context.Context, ticker string) (map[string]interface{}, error) {
-	return c.get(ctx, "/stockquote/"+ticker, nil)
+	return c.get(ctx, "/stockquote/"+seg(ticker), nil)
 }
 
 // OptionQuote returns option quotes with greeks for the given ticker.
@@ -469,18 +472,18 @@ func (c *Client) OptionQuote(ctx context.Context, ticker string, opts ...OptionQ
 	if cfg.typ != "" {
 		params.Set("type", cfg.typ)
 	}
-	return c.get(ctx, "/optionquote/"+ticker, params)
+	return c.get(ctx, "/optionquote/"+seg(ticker), params)
 }
 
 // StockSummary returns a comprehensive stock summary (price, vol, exposure, macro).
 func (c *Client) StockSummary(ctx context.Context, symbol string) (map[string]interface{}, error) {
-	return c.get(ctx, "/v1/stock/"+symbol+"/summary", nil)
+	return c.get(ctx, "/v1/stock/"+seg(symbol)+"/summary", nil)
 }
 
 // Surface returns the volatility surface grid. This endpoint is public and does not
 // require authentication.
 func (c *Client) Surface(ctx context.Context, symbol string) (map[string]interface{}, error) {
-	return c.get(ctx, "/v1/surface/"+symbol, nil)
+	return c.get(ctx, "/v1/surface/"+seg(symbol), nil)
 }
 
 // ── Historical Data ───────────────────────────────────────────────────────────
@@ -493,7 +496,7 @@ func (c *Client) HistoricalStockQuote(ctx context.Context, ticker, date string, 
 	if len(timeStr) > 0 && timeStr[0] != "" {
 		params.Set("time", timeStr[0])
 	}
-	return c.get(ctx, "/historical/stockquote/"+ticker, params)
+	return c.get(ctx, "/historical/stockquote/"+seg(ticker), params)
 }
 
 // HistoricalOptionQuote returns historical option quotes (minute-by-minute).
@@ -518,7 +521,7 @@ func (c *Client) HistoricalOptionQuote(ctx context.Context, ticker, date string,
 	if cfg.typ != "" {
 		params.Set("type", cfg.typ)
 	}
-	return c.get(ctx, "/historical/optionquote/"+ticker, params)
+	return c.get(ctx, "/historical/optionquote/"+seg(ticker), params)
 }
 
 // ── Pricing & Sizing ──────────────────────────────────────────────────────────
@@ -594,14 +597,14 @@ func (c *Client) Kelly(ctx context.Context, p KellyParams) (map[string]interface
 // Volatility returns comprehensive volatility analysis for the given symbol.
 // Requires Growth+ plan.
 func (c *Client) Volatility(ctx context.Context, symbol string) (map[string]interface{}, error) {
-	return c.get(ctx, "/v1/volatility/"+symbol, nil)
+	return c.get(ctx, "/v1/volatility/"+seg(symbol), nil)
 }
 
 // AdvVolatility returns advanced volatility analytics: SVI parameters, variance
 // surface, arbitrage detection, greeks surfaces, and variance swap pricing.
 // Requires Alpha+ plan.
 func (c *Client) AdvVolatility(ctx context.Context, symbol string) (map[string]interface{}, error) {
-	return c.get(ctx, "/v1/adv_volatility/"+symbol, nil)
+	return c.get(ctx, "/v1/adv_volatility/"+seg(symbol), nil)
 }
 
 // ── Reference Data ────────────────────────────────────────────────────────────
@@ -613,7 +616,7 @@ func (c *Client) Tickers(ctx context.Context) (map[string]interface{}, error) {
 
 // Options returns option chain metadata (expirations and strikes) for the ticker.
 func (c *Client) Options(ctx context.Context, ticker string) (map[string]interface{}, error) {
-	return c.get(ctx, "/v1/options/"+ticker, nil)
+	return c.get(ctx, "/v1/options/"+seg(ticker), nil)
 }
 
 // Symbols returns all currently queried symbols with live data.
@@ -652,7 +655,7 @@ func (c *Client) MaxPain(ctx context.Context, symbol string, opts ...MaxPainOpti
 	if cfg.expiration != "" {
 		params.Set("expiration", cfg.expiration)
 	}
-	return c.get(ctx, "/v1/maxpain/"+symbol, params)
+	return c.get(ctx, "/v1/maxpain/"+seg(symbol), params)
 }
 
 // ScreenerRequest is the request body for the live options screener. All fields
@@ -872,7 +875,7 @@ type VrpResponse struct {
 //
 // Top-level composite scores: resp.NetHarvestScore, resp.DealerFlowRisk.
 func (c *Client) Vrp(ctx context.Context, symbol string) (*VrpResponse, error) {
-	raw, err := c.get(ctx, "/v1/vrp/"+symbol, nil)
+	raw, err := c.get(ctx, "/v1/vrp/"+seg(symbol), nil)
 	if err != nil {
 		return nil, err
 	}
