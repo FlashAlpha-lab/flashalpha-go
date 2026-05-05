@@ -1005,6 +1005,9 @@ func TestVrp_CompositeScores_TopLevel(t *testing.T) {
 	}
 }
 
+// TestExposureSummary: every field declared in ExposureSummaryResponse must
+// be referenced. Inherits the original bug-#1 check: net_gex must NOT exist
+// at the top level — it lives under `exposures`.
 func TestExposureSummary_NetGex_UnderExposures(t *testing.T) {
 	client := newIntegrationClient(t)
 	ctx, cancel := integrationCtx()
@@ -1014,36 +1017,101 @@ func TestExposureSummary_NetGex_UnderExposures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ExposureSummary SPY: %v", err)
 	}
-	if sym, _ := r["symbol"].(string); sym != "SPY" {
-		t.Errorf("symbol = %q, want SPY", sym)
-	}
+	// Original bug #1
 	if _, ok := r["net_gex"]; ok {
 		t.Error("net_gex present at top level — must live under exposures")
 	}
-	exp, ok := r["exposures"].(map[string]interface{})
-	if !ok {
-		t.Fatal("exposures missing or wrong type")
+	// ── top-level scalars ──
+	if sym, _ := r["symbol"].(string); sym != "SPY" {
+		t.Errorf("symbol = %q, want SPY", sym)
 	}
-	if v, ok := exp["net_gex"]; !ok {
-		t.Error("exposures.net_gex missing")
-	} else if _, isNum := v.(float64); !isNum {
-		t.Errorf("exposures.net_gex not numeric: %T", v)
+	if _, ok := r["underlying_price"].(float64); !ok {
+		t.Errorf("underlying_price missing/non-number: %v", r["underlying_price"])
 	}
-	for _, k := range []string{"net_dex", "net_vex", "net_chex"} {
-		if v, ok := exp[k]; ok {
-			if _, isNum := v.(float64); !isNum {
-				t.Errorf("exposures.%s not numeric: %T", k, v)
-			}
-		}
+	if asOf, _ := r["as_of"].(string); asOf == "" {
+		t.Errorf("as_of missing/empty: %v", r["as_of"])
+	}
+	if _, ok := r["gamma_flip"].(float64); !ok {
+		t.Errorf("gamma_flip missing/non-number: %v", r["gamma_flip"])
 	}
 	regime, ok := r["regime"].(string)
 	if !ok {
 		t.Fatal("regime missing or not a string at top level")
 	}
 	switch regime {
-	case "positive_gamma", "negative_gamma", "neutral":
+	case "positive_gamma", "negative_gamma", "neutral", "undetermined":
 	default:
 		t.Errorf("regime = %q unexpected", regime)
+	}
+	// ── exposures block (4 fields) ──
+	exp, ok := r["exposures"].(map[string]interface{})
+	if !ok {
+		t.Fatal("exposures missing or wrong type")
+	}
+	for _, k := range []string{"net_gex", "net_dex", "net_vex", "net_chex"} {
+		v, present := exp[k]
+		if !present {
+			t.Errorf("exposures.%s missing", k)
+			continue
+		}
+		if _, isNum := v.(float64); !isNum {
+			t.Errorf("exposures.%s not numeric: %T", k, v)
+		}
+	}
+	// ── interpretation block (3 fields) ──
+	interp, _ := r["interpretation"].(map[string]interface{})
+	for _, k := range []string{"gamma", "vanna", "charm"} {
+		v, ok := interp[k].(string)
+		if !ok || v == "" {
+			t.Errorf("interpretation.%s missing/empty", k)
+		}
+	}
+	// ── hedging_estimate (every leaf on both sides) ──
+	hedging, _ := r["hedging_estimate"].(map[string]interface{})
+	for _, sideKey := range []string{"spot_up_1pct", "spot_down_1pct"} {
+		side, _ := hedging[sideKey].(map[string]interface{})
+		dir, _ := side["direction"].(string)
+		if dir != "buy" && dir != "sell" {
+			t.Errorf("%s.direction=%q, want buy/sell", sideKey, dir)
+		}
+		if _, ok := side["dealer_shares_to_trade"].(float64); !ok {
+			t.Errorf("%s.dealer_shares_to_trade missing/non-number", sideKey)
+		}
+		notional, ok := side["notional_usd"].(float64)
+		if !ok {
+			t.Errorf("%s.notional_usd missing/non-number", sideKey)
+		}
+		if notional == 0 {
+			t.Errorf("%s.notional_usd is zero", sideKey)
+		}
+	}
+	up, _ := hedging["spot_up_1pct"].(map[string]interface{})
+	dn, _ := hedging["spot_down_1pct"].(map[string]interface{})
+	upShares, _ := up["dealer_shares_to_trade"].(float64)
+	dnShares, _ := dn["dealer_shares_to_trade"].(float64)
+	if upShares != -dnShares {
+		t.Errorf("hedging not symmetric: up=%v down=%v", upShares, dnShares)
+	}
+	// ── zero_dte block (3 fields) ──
+	z, ok := r["zero_dte"].(map[string]interface{})
+	if !ok {
+		t.Fatal("zero_dte block missing or wrong type")
+	}
+	for _, k := range []string{"net_gex", "pct_of_total_gex"} {
+		if _, present := z[k]; !present {
+			t.Errorf("zero_dte.%s key missing", k)
+		} else if v := z[k]; v != nil {
+			if _, ok := v.(float64); !ok {
+				t.Errorf("zero_dte.%s non-number: %T", k, v)
+			}
+		}
+	}
+	if _, present := z["expiration"]; !present {
+		t.Error("zero_dte.expiration key missing")
+	} else if v := z["expiration"]; v != nil {
+		if _, ok := v.(string); !ok {
+			t.Errorf("zero_dte.expiration non-string: %T", v)
+		}
 	}
 }
 
