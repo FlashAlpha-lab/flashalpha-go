@@ -27,12 +27,11 @@ type ExposureSummaryResponse struct {
 	// following likely). One of the two or three numbers most experienced
 	// users actually look at on this endpoint.
 	GammaFlip *float64 `json:"gamma_flip"`
-	// Dealer-positioning regime classifier. Confirmed live values across all
-	// 5 SDK integration test suites:
-	//   "positive_gamma" | "negative_gamma" | "neutral"
-	// Documented fourth: "undetermined" (no usable options data). "neutral"
-	// appears in edge cases where net_gex straddles zero. Don't conflate
-	// with maxpain.signal (a separate bullish/bearish/neutral classifier).
+	// Dealer-positioning regime classifier. Confirmed values:
+	//   "positive_gamma" | "negative_gamma" | "unknown"
+	// "unknown" is returned when there's no gamma flip / no usable options
+	// data. Don't conflate with maxpain.signal (a separate bullish/bearish/
+	// neutral classifier).
 	Regime string `json:"regime"`
 	// Net Greek totals across the entire chain. See ExposureSummaryExposures.
 	Exposures *ExposureSummaryExposures `json:"exposures"`

@@ -42,7 +42,7 @@ type MaxPainResponse struct {
 	// GEX-based dealer alignment overlay.
 	DealerAlignment *MaxPainDealerAlignment `json:"dealer_alignment"`
 	// Same gamma classification as on exposure_summary.regime:
-	// "positive_gamma" | "negative_gamma" | "neutral" | "undetermined".
+	// "positive_gamma" | "negative_gamma" | "unknown".
 	Regime *string `json:"regime"`
 	// Expected move from the ATM straddle, contextualized vs max pain.
 	ExpectedMove *MaxPainExpectedMove `json:"expected_move"`
