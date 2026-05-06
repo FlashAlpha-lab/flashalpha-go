@@ -33,9 +33,10 @@ type ZeroDteRegime struct {
 	// GammaFlip.
 	DistanceToFlipDollars *float64 `json:"distance_to_flip_dollars"`
 	// DistanceToFlipSigmas is the 1σ-normalized distance to the gamma flip,
-	// using ATM IV * sqrt(t_remain) as the intraday vol scaler. Lets you
-	// compare flip proximity across symbols and across time-of-day:
-	// |sigmas| < 0.25 is "imminent flip risk".
+	// using the remaining-time σ during the session (ATM IV × √t_remain)
+	// and falling back to a full-day σ when the market is closed. <1.0 means
+	// the flip is well within a 1σ move; lets you compare flip proximity
+	// across symbols and across time-of-day on a common scale.
 	DistanceToFlipSigmas *float64 `json:"distance_to_flip_sigmas"`
 }
 
@@ -472,8 +473,9 @@ type ZeroDteResponse struct {
 	// TimeToCloseHours is hours remaining until the regular-session close.
 	// Drives ThetaPerHourRemaining and Remaining1SdDollars.
 	TimeToCloseHours *float64 `json:"time_to_close_hours"`
-	// TimeToClosePct is fraction (0-1) of the regular session still
-	// remaining (1.0 at the open, 0.0 at the close).
+	// TimeToClosePct is the percent of the regular trading day ELAPSED
+	// (0 = at the open, 100 = at the close). Range 0-100. Useful for
+	// time-weighting intraday metrics.
 	TimeToClosePct *float64 `json:"time_to_close_pct"`
 	// Regime is the gamma-regime block (positive_gamma vs negative_gamma,
 	// gamma-flip strike, distance-to-flip metrics). See ZeroDteRegime.
