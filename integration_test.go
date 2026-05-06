@@ -4,6 +4,7 @@ package flashalpha_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"testing"
 	"time"
@@ -643,6 +644,182 @@ func TestIntegrationMaxPainMultiExpiry(t *testing.T) {
 		if len(cal) == 0 {
 			t.Error("max_pain_by_expiration is empty")
 		}
+	}
+}
+
+// TestMaxPain_EveryFieldDeclaredInPocoMustBeReferenced asserts that every
+// leaf field declared in MaxPainResponse is referenced. JSON-roundtrips the
+// raw map response into the typed POCO so the wire format and type
+// definition stay in lockstep.
+func TestMaxPain_EveryFieldDeclaredInPocoMustBeReferenced(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	raw, err := client.MaxPain(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("MaxPain SPY: %v", err)
+	}
+	buf, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("re-encode: %v", err)
+	}
+	r := &flashalpha.MaxPainResponse{}
+	if err := json.Unmarshal(buf, r); err != nil {
+		t.Fatalf("decode into MaxPainResponse: %v", err)
+	}
+
+	// ── top-level scalars ──
+	if r.Symbol != "SPY" {
+		t.Errorf("Symbol=%q", r.Symbol)
+	}
+	if r.UnderlyingPrice == nil || *r.UnderlyingPrice <= 0 {
+		t.Errorf("UnderlyingPrice=%v", r.UnderlyingPrice)
+	}
+	if r.AsOf == "" {
+		t.Error("AsOf empty")
+	}
+	if r.MaxPainStrike == nil {
+		t.Error("MaxPainStrike nil")
+	}
+	if r.Signal == nil ||
+		(*r.Signal != "bullish" && *r.Signal != "bearish" && *r.Signal != "neutral") {
+		t.Errorf("Signal=%v", r.Signal)
+	}
+	if r.Expiration == nil || *r.Expiration == "" {
+		t.Error("Expiration empty")
+	}
+	if r.PutCallOiRatio == nil {
+		t.Error("PutCallOiRatio nil")
+	}
+	if r.Regime == nil {
+		t.Error("Regime nil")
+	} else {
+		switch *r.Regime {
+		case "positive_gamma", "negative_gamma", "neutral", "undetermined":
+		default:
+			t.Errorf("Regime=%q", *r.Regime)
+		}
+	}
+	if r.PinProbability == nil || *r.PinProbability < 0 || *r.PinProbability > 100 {
+		t.Errorf("PinProbability=%v", r.PinProbability)
+	}
+
+	// ── distance ──
+	if r.Distance == nil {
+		t.Fatal("Distance nil")
+	}
+	if r.Distance.Absolute == nil {
+		t.Error("Distance.Absolute nil")
+	}
+	if r.Distance.Percent == nil {
+		t.Error("Distance.Percent nil")
+	}
+	if r.Distance.Direction == nil ||
+		(*r.Distance.Direction != "above" && *r.Distance.Direction != "below" && *r.Distance.Direction != "at") {
+		t.Errorf("Distance.Direction=%v", r.Distance.Direction)
+	}
+
+	// ── pain_curve[] ──
+	if len(r.PainCurve) == 0 {
+		t.Fatal("PainCurve empty")
+	}
+	pc := r.PainCurve[0]
+	if pc.Strike == nil {
+		t.Error("PainCurve[0].Strike nil")
+	}
+	if pc.CallPain == nil {
+		t.Error("PainCurve[0].CallPain nil")
+	}
+	if pc.PutPain == nil {
+		t.Error("PainCurve[0].PutPain nil")
+	}
+	if pc.TotalPain == nil {
+		t.Error("PainCurve[0].TotalPain nil")
+	}
+
+	// ── oi_by_strike[] ──
+	if len(r.OiByStrike) == 0 {
+		t.Fatal("OiByStrike empty")
+	}
+	oi := r.OiByStrike[0]
+	if oi.Strike == nil {
+		t.Error("OiByStrike[0].Strike nil")
+	}
+	if oi.CallOi == nil {
+		t.Error("OiByStrike[0].CallOi nil")
+	}
+	if oi.PutOi == nil {
+		t.Error("OiByStrike[0].PutOi nil")
+	}
+	if oi.TotalOi == nil {
+		t.Error("OiByStrike[0].TotalOi nil")
+	}
+	if oi.CallVolume == nil {
+		t.Error("OiByStrike[0].CallVolume nil")
+	}
+	if oi.PutVolume == nil {
+		t.Error("OiByStrike[0].PutVolume nil")
+	}
+
+	// ── max_pain_by_expiration[] (no filter on this call) ──
+	if len(r.MaxPainByExpiration) == 0 {
+		t.Fatal("MaxPainByExpiration empty")
+	}
+	mr := r.MaxPainByExpiration[0]
+	if mr.Expiration == nil || *mr.Expiration == "" {
+		t.Error("MaxPainByExpiration[0].Expiration empty")
+	}
+	if mr.MaxPainStrike == nil {
+		t.Error("MaxPainByExpiration[0].MaxPainStrike nil")
+	}
+	if mr.Dte == nil {
+		t.Error("MaxPainByExpiration[0].Dte nil")
+	}
+	if mr.TotalOi == nil {
+		t.Error("MaxPainByExpiration[0].TotalOi nil")
+	}
+
+	// ── dealer_alignment ──
+	if r.DealerAlignment == nil {
+		t.Fatal("DealerAlignment nil")
+	}
+	da := r.DealerAlignment
+	if da.Alignment == nil {
+		t.Error("DealerAlignment.Alignment nil")
+	} else {
+		switch *da.Alignment {
+		case "converging", "moderate", "diverging", "unknown":
+		default:
+			t.Errorf("DealerAlignment.Alignment=%q", *da.Alignment)
+		}
+	}
+	if da.Description == nil || *da.Description == "" {
+		t.Error("DealerAlignment.Description empty")
+	}
+	if da.GammaFlip == nil {
+		t.Error("DealerAlignment.GammaFlip nil")
+	}
+	if da.CallWall == nil {
+		t.Error("DealerAlignment.CallWall nil")
+	}
+	if da.PutWall == nil {
+		t.Error("DealerAlignment.PutWall nil")
+	}
+
+	// ── expected_move ──
+	if r.ExpectedMove == nil {
+		t.Fatal("ExpectedMove nil")
+	}
+	em := r.ExpectedMove
+	if em.StraddlePrice == nil {
+		t.Error("ExpectedMove.StraddlePrice nil")
+	}
+	if em.AtmIv == nil {
+		t.Error("ExpectedMove.AtmIv nil")
+	}
+	if em.MaxPainWithinExpectedRange == nil {
+		t.Error("ExpectedMove.MaxPainWithinExpectedRange nil")
 	}
 }
 
