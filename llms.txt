@@ -1,0 +1,49 @@
+# flashalpha-go
+
+> Official Go SDK for the [FlashAlpha](https://flashalpha.com) options analytics API — institutional-grade gamma exposure (GEX), delta exposure (DEX), vanna/charm exposure, 0DTE pin risk, max pain, variance risk premium (VRP), volatility surfaces, and a live options screener. One round-trip per analytic, typed Go response models, no external dependencies.
+
+FlashAlpha is the analytics API for **options dealer flow**. The same numbers that drive intraday equity-index moves — net dealer GEX, the gamma flip, call/put walls, vanna/charm hedging — are exposed as REST endpoints with typed responses.
+
+This SDK gives Go applications and AI agents direct access to that data. Every endpoint is one method call; the typed response models surface load-bearing fields (dealer-Greek aggregates, 0DTE pin scores, hedging-flow estimates, regime classifiers) with full doc comments so they're discoverable from `gopls` / `go doc` without leaving the editor.
+
+- **Install:** `go get github.com/FlashAlpha-lab/flashalpha-go` (Go 1.21+, no external deps)
+- **Sister SDK for replay:** `go get github.com/FlashAlpha-lab/flashalpha-historical-go` — same shape, point-in-time `at=` parameter
+- **Sign up & API keys:** [https://flashalpha.com](https://flashalpha.com)
+- **Interactive playground:** [https://lab.flashalpha.com/swagger](https://lab.flashalpha.com/swagger)
+
+## Key endpoints
+
+- `Gex / Dex / Vex / Chex(ctx, symbol, ...)` — per-strike gamma / delta / vanna / charm exposure (Free+).
+- `ExposureSummary(ctx, symbol)` — net dealer Greeks, gamma flip, hedging estimates, 0DTE attribution, regime narrative (Growth+).
+- `ZeroDte(ctx, symbol, ...)` — same-day-expiry analytics: regime, expected move, pin risk, dealer hedging flow at +/- 10bp / 25bp / 50bp / 1pct, decay, vol context (Growth+).
+- `MaxPain(ctx, symbol, ...)` — max-pain strike, pain curve, OI breakdown, dealer-alignment overlay, pin probability (Growth+).
+- `Narrative(ctx, symbol)` — server-authored verbal summary of the regime + key levels + flow + outlook. Strings safe to surface verbatim in LLM tool responses (Growth+).
+- `ExposureLevels(ctx, symbol)` — compact key-level view (gamma flip, walls, magnet) (Free+).
+- `StockSummary(ctx, symbol)` — composite snapshot: price, volatility, options flow, dealer exposure, macro context — one round-trip in lieu of five.
+- `Vrp(ctx, symbol)` — variance risk premium: implied-vs-realized vol spread, gamma/vanna conditioning, strategy scores. Returns typed `*VrpResponse` (Alpha+).
+- `Volatility / AdvVolatility(ctx, symbol)` — IV ladder, skew, term structure, SVI calibration, variance-swap pricing.
+- `Greeks / IV / Kelly(ctx, params)` — Black-Scholes-Merton calculator: theoretical price, full first/second/third-order greeks, implied vol from market price, Kelly-criterion sizing.
+- `Screener(ctx, request)` — live options screener — filter and rank by GEX, VRP, harvest scores, custom formulas (Growth+ for 10-symbol universe; Alpha+ for ~250 symbols, formulas, harvest/dealer-flow-risk scores).
+
+## Tier breakdown
+
+- **Free**: GEX/DEX/VEX/CHEX, ExposureLevels, StockQuote, OptionQuote, Surface, StockSummary, BSM Greeks/IV, Tickers, Options, Symbols, Health, Account, Historical stock/option quotes.
+- **Growth**: + ExposureSummary, Narrative, ZeroDte, ExposureHistory, MaxPain, Volatility, Kelly, Screener (10-symbol universe).
+- **Alpha**: + AdvVolatility, Vrp, Screener (full ~250-symbol universe with formulas, harvest scores, dealer-flow-risk scores).
+
+## Authentication
+
+Every request requires an API key passed via the `X-Api-Key` header.
+
+```go
+client := flashalpha.NewClient(os.Getenv("FLASHALPHA_API_KEY"))
+```
+
+Get a key at [https://flashalpha.com](https://flashalpha.com).
+
+## Documentation
+
+- [README](README.md) — full method tables, examples, error types
+- [API reference (docs/api.md)](docs/api.md)
+- [Interactive Swagger playground](https://lab.flashalpha.com/swagger)
+- [FlashAlpha docs](https://flashalpha.com/docs)
