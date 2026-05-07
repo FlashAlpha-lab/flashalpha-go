@@ -108,3 +108,133 @@ type PricingAdditionalGreeks struct {
 	// (vega's time decay).
 	Veta *float64 `json:"veta"`
 }
+
+// ── /v1/pricing/iv (Free+) ───────────────────────────────────────────────────
+
+// PricingIvInputs echoes the inputs the server actually used for the IV
+// calculation (after defaults are applied for r and q).
+type PricingIvInputs struct {
+	// Spot is the underlying price (dollars).
+	Spot *float64 `json:"spot"`
+	// Strike is the option strike (dollars).
+	Strike *float64 `json:"strike"`
+	// Dte is days to expiration.
+	Dte *float64 `json:"dte"`
+	// Price is the market option price (mid) used as the inversion target.
+	Price *float64 `json:"price"`
+	// Type is "call" or "put".
+	Type *string `json:"type"`
+	// RiskFreeRate is the annualised risk-free rate used (decimal).
+	RiskFreeRate *float64 `json:"risk_free_rate"`
+	// DividendYield is the annualised continuous dividend yield (decimal).
+	DividendYield *float64 `json:"dividend_yield"`
+}
+
+// PricingIvResponse is the typed body of GET /v1/pricing/iv.
+//
+// Newton-Raphson root-find on the BSM model that returns the implied
+// volatility consistent with the supplied market price. ImpliedVolatility is
+// the decimal vol (0.18 = 18%); ImpliedVolatilityPct is the same number in
+// percent.
+type PricingIvResponse struct {
+	// Inputs echoes the BSM inputs the server actually used.
+	Inputs *PricingIvInputs `json:"inputs"`
+	// ImpliedVolatility is the annualised implied vol as a decimal
+	// (e.g. 0.180042 = 18.0%).
+	ImpliedVolatility *float64 `json:"implied_volatility"`
+	// ImpliedVolatilityPct is ImpliedVolatility × 100 (e.g. 18.0).
+	ImpliedVolatilityPct *float64 `json:"implied_volatility_pct"`
+}
+
+// ── /v1/pricing/kelly (Growth+) ──────────────────────────────────────────────
+
+// PricingKellyInputs echoes the inputs the server actually used for the Kelly
+// calculation.
+type PricingKellyInputs struct {
+	// Spot is the underlying price (dollars).
+	Spot *float64 `json:"spot"`
+	// Strike is the option strike (dollars).
+	Strike *float64 `json:"strike"`
+	// Dte is days to expiration.
+	Dte *float64 `json:"dte"`
+	// Sigma is the annualised implied volatility used (decimal).
+	Sigma *float64 `json:"sigma"`
+	// Premium is the option premium paid per share (dollars).
+	Premium *float64 `json:"premium"`
+	// Mu is the user-supplied real-world annualised drift (decimal) used to
+	// build the lognormal distribution Kelly integrates over.
+	Mu *float64 `json:"mu"`
+	// Type is "call" or "put".
+	Type *string `json:"type"`
+	// RiskFreeRate is the annualised risk-free rate used (decimal).
+	RiskFreeRate *float64 `json:"risk_free_rate"`
+	// DividendYield is the annualised continuous dividend yield (decimal).
+	DividendYield *float64 `json:"dividend_yield"`
+}
+
+// PricingKellySizing is the Kelly-fraction sizing block.
+//
+// Half-Kelly is the standard practical recommendation. On negative
+// expected-value setups the server returns zeros across all five fields and
+// PricingKellyResponse.Recommendation explains why.
+type PricingKellySizing struct {
+	// KellyFraction is the full-Kelly optimal bankroll fraction (0–1).
+	KellyFraction *float64 `json:"kelly_fraction"`
+	// HalfKelly is KellyFraction / 2 — the standard practical recommendation.
+	HalfKelly *float64 `json:"half_kelly"`
+	// QuarterKelly is KellyFraction / 4 — a conservative practical sizing.
+	QuarterKelly *float64 `json:"quarter_kelly"`
+	// KellyPct is KellyFraction expressed as a percent (e.g. 7.68 = 7.68%).
+	KellyPct *float64 `json:"kelly_pct"`
+	// HalfKellyPct is HalfKelly as a percent.
+	HalfKellyPct *float64 `json:"half_kelly_pct"`
+}
+
+// PricingKellyAnalysis is the analysis block — expected ROI, win
+// probabilities, breakeven, and the expected log-growth rate.
+//
+// All probabilities are real-world (computed under Mu), not risk-neutral.
+type PricingKellyAnalysis struct {
+	// ExpectedRoi is the expected return on investment (decimal,
+	// payoff/premium - 1).
+	ExpectedRoi *float64 `json:"expected_roi"`
+	// ExpectedRoiPct is ExpectedRoi as a percent.
+	ExpectedRoiPct *float64 `json:"expected_roi_pct"`
+	// ExpectedPayoff is the expected payoff per share (dollars).
+	ExpectedPayoff *float64 `json:"expected_payoff"`
+	// ProbabilityOfProfit is the real-world probability the trade is
+	// profitable at expiry (decimal).
+	ProbabilityOfProfit *float64 `json:"probability_of_profit"`
+	// ProbabilityOfProfitPct is ProbabilityOfProfit as a percent.
+	ProbabilityOfProfitPct *float64 `json:"probability_of_profit_pct"`
+	// ProbabilityItm is the real-world probability the option is ITM at
+	// expiry (decimal).
+	ProbabilityItm *float64 `json:"probability_itm"`
+	// ProbabilityItmPct is ProbabilityItm as a percent.
+	ProbabilityItmPct *float64 `json:"probability_itm_pct"`
+	// MaxLoss is the maximum loss per share (= premium paid).
+	MaxLoss *float64 `json:"max_loss"`
+	// Breakeven is the underlying price needed at expiry to break even.
+	Breakeven *float64 `json:"breakeven"`
+	// ExpectedGrowthRate is the expected log-growth rate of bankroll at the
+	// Kelly fraction.
+	ExpectedGrowthRate *float64 `json:"expected_growth_rate"`
+}
+
+// PricingKellyResponse is the typed body of GET /v1/pricing/kelly.
+//
+// Numerical-integration Kelly criterion sizing for an option trade. Uses the
+// real-world (Mu-conditioned) lognormal distribution rather than the
+// risk-neutral measure. On negative-EV setups Sizing fields are all zero and
+// Recommendation explains the no-position outcome.
+type PricingKellyResponse struct {
+	// Inputs echoes the inputs the server actually used.
+	Inputs *PricingKellyInputs `json:"inputs"`
+	// Sizing is the Kelly-fraction block (full / half / quarter).
+	Sizing *PricingKellySizing `json:"sizing"`
+	// Analysis is the expected-value / probability / breakeven block.
+	Analysis *PricingKellyAnalysis `json:"analysis"`
+	// Recommendation is a human-readable sizing recommendation safe to
+	// surface verbatim (e.g. "Risk 3.8% of bankroll (half-Kelly).").
+	Recommendation *string `json:"recommendation"`
+}

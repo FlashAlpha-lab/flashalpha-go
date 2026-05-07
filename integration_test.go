@@ -2170,3 +2170,845 @@ func TestIntegrationPricingGreeks_EveryFieldDeclaredInPocoMustBeReferenced(t *te
 		t.Error("Additional.Veta nil")
 	}
 }
+
+// ── rc.9 typed-POCO field-walk tests ─────────────────────────────────────────
+//
+// Each test below decodes the live raw response into the canonical typed
+// POCO and asserts every exported pointer field on a SPY response is non-nil
+// (modulo documented nullable / quiet-day fields). The same discipline as
+// the existing TestIntegrationXxx_EveryFieldDeclaredInPocoMustBeReferenced
+// tests above — extended to the rc.9-typed responses.
+
+// TestIntegrationVolatility_EveryFieldDeclaredInPocoMustBeReferenced —
+// 100% field-coverage walk against VolatilityResponse on SPY.
+//
+// Documented best-effort fields (referenced but not asserted non-nil):
+//   - SkewProfiles[0].Put10dIv / Call10dIv / SmileRatio / TailConvexity
+//     (10Δ wings + smile-ratio require a deep enough chain — quiet-day fall back)
+//   - IvRvSpreads.Assessment (server-generated; sometimes empty on quiet days)
+func TestIntegrationVolatility_EveryFieldDeclaredInPocoMustBeReferenced(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	raw, err := client.Volatility(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("Volatility SPY: %v", err)
+	}
+	buf, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("re-encode: %v", err)
+	}
+	r := &flashalpha.VolatilityResponse{}
+	if err := json.Unmarshal(buf, r); err != nil {
+		t.Fatalf("decode into VolatilityResponse: %v", err)
+	}
+
+	if r.Symbol != "SPY" {
+		t.Errorf("Symbol=%q", r.Symbol)
+	}
+	if r.UnderlyingPrice == nil || *r.UnderlyingPrice <= 0 {
+		t.Errorf("UnderlyingPrice=%v", r.UnderlyingPrice)
+	}
+	if r.AsOf == "" {
+		t.Error("AsOf empty")
+	}
+	_ = r.MarketOpen
+	if r.AtmIv == nil {
+		t.Error("AtmIv nil")
+	}
+
+	// RealizedVol — every leaf populated on liquid names.
+	if r.RealizedVol == nil {
+		t.Fatal("RealizedVol nil")
+	}
+	for label, ptr := range map[string]*float64{
+		"Rv5d":  r.RealizedVol.Rv5d,
+		"Rv10d": r.RealizedVol.Rv10d,
+		"Rv20d": r.RealizedVol.Rv20d,
+		"Rv30d": r.RealizedVol.Rv30d,
+		"Rv60d": r.RealizedVol.Rv60d,
+	} {
+		if ptr == nil {
+			t.Errorf("RealizedVol.%s nil", label)
+		}
+	}
+
+	// IvRvSpreads
+	if r.IvRvSpreads == nil {
+		t.Fatal("IvRvSpreads nil")
+	}
+	for label, ptr := range map[string]*float64{
+		"Vrp5d":  r.IvRvSpreads.Vrp5d,
+		"Vrp10d": r.IvRvSpreads.Vrp10d,
+		"Vrp20d": r.IvRvSpreads.Vrp20d,
+		"Vrp30d": r.IvRvSpreads.Vrp30d,
+	} {
+		if ptr == nil {
+			t.Errorf("IvRvSpreads.%s nil", label)
+		}
+	}
+	_ = r.IvRvSpreads.Assessment
+
+	// SkewProfiles — at least one row; assert per-row pointers on the first.
+	if len(r.SkewProfiles) == 0 {
+		t.Fatal("SkewProfiles empty")
+	}
+	sp := r.SkewProfiles[0]
+	if sp.Expiry == nil {
+		t.Error("SkewProfiles[0].Expiry nil")
+	}
+	if sp.DaysToExpiry == nil {
+		t.Error("SkewProfiles[0].DaysToExpiry nil")
+	}
+	if sp.Put25dIv == nil {
+		t.Error("SkewProfiles[0].Put25dIv nil")
+	}
+	if sp.AtmIv == nil {
+		t.Error("SkewProfiles[0].AtmIv nil")
+	}
+	if sp.Call25dIv == nil {
+		t.Error("SkewProfiles[0].Call25dIv nil")
+	}
+	if sp.Skew25d == nil {
+		t.Error("SkewProfiles[0].Skew25d nil")
+	}
+	// 10Δ wings + smile/convexity are best-effort — just reference.
+	_ = sp.Put10dIv
+	_ = sp.Call10dIv
+	_ = sp.SmileRatio
+	_ = sp.TailConvexity
+
+	// TermStructure
+	if r.TermStructure == nil {
+		t.Fatal("TermStructure nil")
+	}
+	if r.TermStructure.NearSlopePct == nil {
+		t.Error("TermStructure.NearSlopePct nil")
+	}
+	// FarSlopePct + State are best-effort on quiet days.
+	_ = r.TermStructure.FarSlopePct
+	_ = r.TermStructure.State
+
+	// IvDispersion
+	if r.IvDispersion == nil {
+		t.Fatal("IvDispersion nil")
+	}
+	if r.IvDispersion.CrossExpiry == nil {
+		t.Error("IvDispersion.CrossExpiry nil")
+	}
+	if r.IvDispersion.CrossStrike == nil {
+		t.Error("IvDispersion.CrossStrike nil")
+	}
+
+	// GexByDte / ThetaByDte
+	if len(r.GexByDte) == 0 {
+		t.Error("GexByDte empty")
+	} else {
+		row := r.GexByDte[0]
+		if row.Bucket == nil {
+			t.Error("GexByDte[0].Bucket nil")
+		}
+		if row.NetGex == nil {
+			t.Error("GexByDte[0].NetGex nil")
+		}
+		if row.PctOfTotal == nil {
+			t.Error("GexByDte[0].PctOfTotal nil")
+		}
+		if row.ContractCount == nil {
+			t.Error("GexByDte[0].ContractCount nil")
+		}
+	}
+	if len(r.ThetaByDte) == 0 {
+		t.Error("ThetaByDte empty")
+	} else {
+		row := r.ThetaByDte[0]
+		if row.Bucket == nil {
+			t.Error("ThetaByDte[0].Bucket nil")
+		}
+		if row.NetTheta == nil {
+			t.Error("ThetaByDte[0].NetTheta nil")
+		}
+		if row.ContractCount == nil {
+			t.Error("ThetaByDte[0].ContractCount nil")
+		}
+	}
+
+	// PutCallProfile
+	if r.PutCallProfile == nil {
+		t.Fatal("PutCallProfile nil")
+	}
+	if len(r.PutCallProfile.ByExpiry) == 0 {
+		t.Error("PutCallProfile.ByExpiry empty")
+	} else {
+		row := r.PutCallProfile.ByExpiry[0]
+		if row.Expiry == nil {
+			t.Error("ByExpiry[0].Expiry nil")
+		}
+		if row.CallOi == nil {
+			t.Error("ByExpiry[0].CallOi nil")
+		}
+		if row.PutOi == nil {
+			t.Error("ByExpiry[0].PutOi nil")
+		}
+		if row.PcRatioOi == nil {
+			t.Error("ByExpiry[0].PcRatioOi nil")
+		}
+		if row.CallVolume == nil {
+			t.Error("ByExpiry[0].CallVolume nil")
+		}
+		if row.PutVolume == nil {
+			t.Error("ByExpiry[0].PutVolume nil")
+		}
+		if row.PcRatioVolume == nil {
+			t.Error("ByExpiry[0].PcRatioVolume nil")
+		}
+	}
+	if r.PutCallProfile.ByMoneyness == nil {
+		t.Fatal("PutCallProfile.ByMoneyness nil")
+	}
+	for label, ptr := range map[string]*int{
+		"OtmCallOi": r.PutCallProfile.ByMoneyness.OtmCallOi,
+		"AtmCallOi": r.PutCallProfile.ByMoneyness.AtmCallOi,
+		"ItmCallOi": r.PutCallProfile.ByMoneyness.ItmCallOi,
+		"OtmPutOi":  r.PutCallProfile.ByMoneyness.OtmPutOi,
+		"AtmPutOi":  r.PutCallProfile.ByMoneyness.AtmPutOi,
+		"ItmPutOi":  r.PutCallProfile.ByMoneyness.ItmPutOi,
+	} {
+		if ptr == nil {
+			t.Errorf("ByMoneyness.%s nil", label)
+		}
+	}
+
+	// OiConcentration
+	if r.OiConcentration == nil {
+		t.Fatal("OiConcentration nil")
+	}
+	if r.OiConcentration.Top3Pct == nil {
+		t.Error("OiConcentration.Top3Pct nil")
+	}
+	if r.OiConcentration.Top5Pct == nil {
+		t.Error("OiConcentration.Top5Pct nil")
+	}
+	if r.OiConcentration.Top10Pct == nil {
+		t.Error("OiConcentration.Top10Pct nil")
+	}
+	if r.OiConcentration.Herfindahl == nil {
+		t.Error("OiConcentration.Herfindahl nil")
+	}
+
+	// HedgingScenarios
+	if len(r.HedgingScenarios) == 0 {
+		t.Error("HedgingScenarios empty")
+	} else {
+		row := r.HedgingScenarios[0]
+		if row.MovePct == nil {
+			t.Error("HedgingScenarios[0].MovePct nil")
+		}
+		if row.DealerShares == nil {
+			t.Error("HedgingScenarios[0].DealerShares nil")
+		}
+		if row.Direction == nil {
+			t.Error("HedgingScenarios[0].Direction nil")
+		}
+		if row.NotionalUsd == nil {
+			t.Error("HedgingScenarios[0].NotionalUsd nil")
+		}
+	}
+
+	// Liquidity
+	if r.Liquidity == nil {
+		t.Fatal("Liquidity nil")
+	}
+	if r.Liquidity.AtmAvgSpreadPct == nil {
+		t.Error("Liquidity.AtmAvgSpreadPct nil")
+	}
+	if r.Liquidity.WingAvgSpreadPct == nil {
+		t.Error("Liquidity.WingAvgSpreadPct nil")
+	}
+	if r.Liquidity.AtmContracts == nil {
+		t.Error("Liquidity.AtmContracts nil")
+	}
+	if r.Liquidity.WingContracts == nil {
+		t.Error("Liquidity.WingContracts nil")
+	}
+}
+
+// TestIntegrationAdvVolatility_EveryFieldDeclaredInPocoMustBeReferenced —
+// 100% field-coverage walk against AdvVolatilityResponse on SPY.
+//
+// ArbitrageFlags is asserted-but-not-required (on a clean SPY surface there
+// may be no detected arbitrages — the slice can be empty).
+func TestIntegrationAdvVolatility_EveryFieldDeclaredInPocoMustBeReferenced(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	raw, err := client.AdvVolatility(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("AdvVolatility SPY: %v", err)
+	}
+	buf, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("re-encode: %v", err)
+	}
+	r := &flashalpha.AdvVolatilityResponse{}
+	if err := json.Unmarshal(buf, r); err != nil {
+		t.Fatalf("decode into AdvVolatilityResponse: %v", err)
+	}
+
+	if r.Symbol != "SPY" {
+		t.Errorf("Symbol=%q", r.Symbol)
+	}
+	if r.UnderlyingPrice == nil || *r.UnderlyingPrice <= 0 {
+		t.Errorf("UnderlyingPrice=%v", r.UnderlyingPrice)
+	}
+	if r.AsOf == "" {
+		t.Error("AsOf empty")
+	}
+	_ = r.MarketOpen
+
+	// SviParameters — every per-row leaf.
+	if len(r.SviParameters) == 0 {
+		t.Fatal("SviParameters empty")
+	}
+	svi := r.SviParameters[0]
+	if svi.Expiry == nil {
+		t.Error("SviParameters[0].Expiry nil")
+	}
+	if svi.DaysToExpiry == nil {
+		t.Error("SviParameters[0].DaysToExpiry nil")
+	}
+	for label, ptr := range map[string]*float64{
+		"Forward":          svi.Forward,
+		"A":                svi.A,
+		"B":                svi.B,
+		"Rho":              svi.Rho,
+		"M":                svi.M,
+		"Sigma":            svi.Sigma,
+		"AtmTotalVariance": svi.AtmTotalVariance,
+		"AtmIv":            svi.AtmIv,
+	} {
+		if ptr == nil {
+			t.Errorf("SviParameters[0].%s nil", label)
+		}
+	}
+
+	// ForwardPrices
+	if len(r.ForwardPrices) == 0 {
+		t.Fatal("ForwardPrices empty")
+	}
+	fp := r.ForwardPrices[0]
+	if fp.Expiry == nil {
+		t.Error("ForwardPrices[0].Expiry nil")
+	}
+	if fp.DaysToExpiry == nil {
+		t.Error("ForwardPrices[0].DaysToExpiry nil")
+	}
+	if fp.Forward == nil {
+		t.Error("ForwardPrices[0].Forward nil")
+	}
+	if fp.Spot == nil {
+		t.Error("ForwardPrices[0].Spot nil")
+	}
+	if fp.BasisPct == nil {
+		t.Error("ForwardPrices[0].BasisPct nil")
+	}
+
+	// TotalVarianceSurface
+	if r.TotalVarianceSurface == nil {
+		t.Fatal("TotalVarianceSurface nil")
+	}
+	if len(r.TotalVarianceSurface.Moneyness) == 0 {
+		t.Error("TotalVarianceSurface.Moneyness empty")
+	}
+	if len(r.TotalVarianceSurface.Expiries) == 0 {
+		t.Error("TotalVarianceSurface.Expiries empty")
+	}
+	if len(r.TotalVarianceSurface.Tenors) == 0 {
+		t.Error("TotalVarianceSurface.Tenors empty")
+	}
+	if len(r.TotalVarianceSurface.TotalVariance) == 0 {
+		t.Error("TotalVarianceSurface.TotalVariance empty")
+	}
+	if len(r.TotalVarianceSurface.ImpliedVol) == 0 {
+		t.Error("TotalVarianceSurface.ImpliedVol empty")
+	}
+
+	// ArbitrageFlags — slice may legitimately be empty; only inspect a row when present.
+	if len(r.ArbitrageFlags) > 0 {
+		af := r.ArbitrageFlags[0]
+		if af.Expiry == nil {
+			t.Error("ArbitrageFlags[0].Expiry nil")
+		}
+		if af.Type == nil {
+			t.Error("ArbitrageFlags[0].Type nil")
+		}
+		if af.StrikeOrK == nil {
+			t.Error("ArbitrageFlags[0].StrikeOrK nil")
+		}
+		if af.Description == nil {
+			t.Error("ArbitrageFlags[0].Description nil")
+		}
+	}
+
+	// VarianceSwapFairValues
+	if len(r.VarianceSwapFairValues) == 0 {
+		t.Fatal("VarianceSwapFairValues empty")
+	}
+	vs := r.VarianceSwapFairValues[0]
+	if vs.Expiry == nil {
+		t.Error("VarianceSwapFairValues[0].Expiry nil")
+	}
+	if vs.DaysToExpiry == nil {
+		t.Error("VarianceSwapFairValues[0].DaysToExpiry nil")
+	}
+	if vs.FairVariance == nil {
+		t.Error("VarianceSwapFairValues[0].FairVariance nil")
+	}
+	if vs.FairVol == nil {
+		t.Error("VarianceSwapFairValues[0].FairVol nil")
+	}
+	if vs.AtmIv == nil {
+		t.Error("VarianceSwapFairValues[0].AtmIv nil")
+	}
+	if vs.ConvexityAdjustment == nil {
+		t.Error("VarianceSwapFairValues[0].ConvexityAdjustment nil")
+	}
+
+	// GreeksSurfaces
+	if r.GreeksSurfaces == nil {
+		t.Fatal("GreeksSurfaces nil")
+	}
+	checkSurface := func(name string, s *flashalpha.AdvGreeksSurface) {
+		t.Helper()
+		if s == nil {
+			t.Errorf("GreeksSurfaces.%s nil", name)
+			return
+		}
+		if len(s.Strikes) == 0 {
+			t.Errorf("GreeksSurfaces.%s.Strikes empty", name)
+		}
+		if len(s.Expiries) == 0 {
+			t.Errorf("GreeksSurfaces.%s.Expiries empty", name)
+		}
+		if len(s.Values) == 0 {
+			t.Errorf("GreeksSurfaces.%s.Values empty", name)
+		}
+	}
+	checkSurface("Vanna", r.GreeksSurfaces.Vanna)
+	checkSurface("Charm", r.GreeksSurfaces.Charm)
+	checkSurface("Volga", r.GreeksSurfaces.Volga)
+	checkSurface("Speed", r.GreeksSurfaces.Speed)
+}
+
+// TestIntegrationSurface_EveryFieldDeclaredInPocoMustBeReferenced —
+// 100% field-coverage walk against SurfaceResponse on SPY.
+func TestIntegrationSurface_EveryFieldDeclaredInPocoMustBeReferenced(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	raw, err := client.Surface(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("Surface SPY: %v", err)
+	}
+	buf, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("re-encode: %v", err)
+	}
+	r := &flashalpha.SurfaceResponse{}
+	if err := json.Unmarshal(buf, r); err != nil {
+		t.Fatalf("decode into SurfaceResponse: %v", err)
+	}
+
+	if r.Symbol != "SPY" {
+		t.Errorf("Symbol=%q", r.Symbol)
+	}
+	if r.Spot == nil || *r.Spot <= 0 {
+		t.Errorf("Spot=%v", r.Spot)
+	}
+	if r.AsOf == "" {
+		t.Error("AsOf empty")
+	}
+	if r.GridSize == nil {
+		t.Error("GridSize nil")
+	}
+	if len(r.Tenors) == 0 {
+		t.Error("Tenors empty")
+	}
+	if len(r.Moneyness) == 0 {
+		t.Error("Moneyness empty")
+	}
+	if len(r.Iv) == 0 {
+		t.Error("Iv empty")
+	}
+	if r.SlicesUsed == nil {
+		t.Error("SlicesUsed nil")
+	}
+}
+
+// TestIntegrationGex_EveryFieldDeclaredInPocoMustBeReferenced —
+// 100% field-coverage walk against GexResponse on SPY.
+//
+// CallOiChange / PutOiChange on the per-strike row are only present when the
+// API has a prior-session baseline — referenced but not asserted non-nil.
+func TestIntegrationGex_EveryFieldDeclaredInPocoMustBeReferenced(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	raw, err := client.Gex(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("Gex SPY: %v", err)
+	}
+	buf, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("re-encode: %v", err)
+	}
+	r := &flashalpha.GexResponse{}
+	if err := json.Unmarshal(buf, r); err != nil {
+		t.Fatalf("decode into GexResponse: %v", err)
+	}
+
+	if r.Symbol != "SPY" {
+		t.Errorf("Symbol=%q", r.Symbol)
+	}
+	if r.UnderlyingPrice == nil || *r.UnderlyingPrice <= 0 {
+		t.Errorf("UnderlyingPrice=%v", r.UnderlyingPrice)
+	}
+	if r.AsOf == "" {
+		t.Error("AsOf empty")
+	}
+	if r.GammaFlip == nil {
+		t.Error("GammaFlip nil")
+	}
+	if r.NetGex == nil {
+		t.Error("NetGex nil")
+	}
+	if r.NetGexLabel == nil {
+		t.Error("NetGexLabel nil")
+	}
+	if len(r.Strikes) == 0 {
+		t.Fatal("Strikes empty")
+	}
+	s := r.Strikes[0]
+	if s.Strike == nil {
+		t.Error("Strikes[0].Strike nil")
+	}
+	if s.CallGex == nil {
+		t.Error("Strikes[0].CallGex nil")
+	}
+	if s.PutGex == nil {
+		t.Error("Strikes[0].PutGex nil")
+	}
+	if s.NetGex == nil {
+		t.Error("Strikes[0].NetGex nil")
+	}
+	if s.CallOi == nil {
+		t.Error("Strikes[0].CallOi nil")
+	}
+	if s.PutOi == nil {
+		t.Error("Strikes[0].PutOi nil")
+	}
+	if s.CallVolume == nil {
+		t.Error("Strikes[0].CallVolume nil")
+	}
+	if s.PutVolume == nil {
+		t.Error("Strikes[0].PutVolume nil")
+	}
+	// OI-change fields require a prior-session baseline — best-effort.
+	_ = s.CallOiChange
+	_ = s.PutOiChange
+}
+
+// TestIntegrationDex_EveryFieldDeclaredInPocoMustBeReferenced —
+// 100% field-coverage walk against DexResponse on SPY.
+func TestIntegrationDex_EveryFieldDeclaredInPocoMustBeReferenced(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	raw, err := client.Dex(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("Dex SPY: %v", err)
+	}
+	buf, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("re-encode: %v", err)
+	}
+	r := &flashalpha.DexResponse{}
+	if err := json.Unmarshal(buf, r); err != nil {
+		t.Fatalf("decode into DexResponse: %v", err)
+	}
+
+	if r.Symbol != "SPY" {
+		t.Errorf("Symbol=%q", r.Symbol)
+	}
+	if r.UnderlyingPrice == nil || *r.UnderlyingPrice <= 0 {
+		t.Errorf("UnderlyingPrice=%v", r.UnderlyingPrice)
+	}
+	if r.AsOf == "" {
+		t.Error("AsOf empty")
+	}
+	if r.NetDex == nil {
+		t.Error("NetDex nil")
+	}
+	if len(r.Strikes) == 0 {
+		t.Fatal("Strikes empty")
+	}
+	s := r.Strikes[0]
+	if s.Strike == nil {
+		t.Error("Strikes[0].Strike nil")
+	}
+	if s.CallDex == nil {
+		t.Error("Strikes[0].CallDex nil")
+	}
+	if s.PutDex == nil {
+		t.Error("Strikes[0].PutDex nil")
+	}
+	if s.NetDex == nil {
+		t.Error("Strikes[0].NetDex nil")
+	}
+}
+
+// TestIntegrationVex_EveryFieldDeclaredInPocoMustBeReferenced —
+// 100% field-coverage walk against VexResponse on SPY.
+func TestIntegrationVex_EveryFieldDeclaredInPocoMustBeReferenced(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	raw, err := client.Vex(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("Vex SPY: %v", err)
+	}
+	buf, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("re-encode: %v", err)
+	}
+	r := &flashalpha.VexResponse{}
+	if err := json.Unmarshal(buf, r); err != nil {
+		t.Fatalf("decode into VexResponse: %v", err)
+	}
+
+	if r.Symbol != "SPY" {
+		t.Errorf("Symbol=%q", r.Symbol)
+	}
+	if r.UnderlyingPrice == nil || *r.UnderlyingPrice <= 0 {
+		t.Errorf("UnderlyingPrice=%v", r.UnderlyingPrice)
+	}
+	if r.AsOf == "" {
+		t.Error("AsOf empty")
+	}
+	if r.NetVex == nil {
+		t.Error("NetVex nil")
+	}
+	if r.VexInterpretation == nil {
+		t.Error("VexInterpretation nil")
+	}
+	if len(r.Strikes) == 0 {
+		t.Fatal("Strikes empty")
+	}
+	s := r.Strikes[0]
+	if s.Strike == nil {
+		t.Error("Strikes[0].Strike nil")
+	}
+	if s.CallVex == nil {
+		t.Error("Strikes[0].CallVex nil")
+	}
+	if s.PutVex == nil {
+		t.Error("Strikes[0].PutVex nil")
+	}
+	if s.NetVex == nil {
+		t.Error("Strikes[0].NetVex nil")
+	}
+}
+
+// TestIntegrationChex_EveryFieldDeclaredInPocoMustBeReferenced —
+// 100% field-coverage walk against ChexResponse on SPY.
+func TestIntegrationChex_EveryFieldDeclaredInPocoMustBeReferenced(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	raw, err := client.Chex(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("Chex SPY: %v", err)
+	}
+	buf, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("re-encode: %v", err)
+	}
+	r := &flashalpha.ChexResponse{}
+	if err := json.Unmarshal(buf, r); err != nil {
+		t.Fatalf("decode into ChexResponse: %v", err)
+	}
+
+	if r.Symbol != "SPY" {
+		t.Errorf("Symbol=%q", r.Symbol)
+	}
+	if r.UnderlyingPrice == nil || *r.UnderlyingPrice <= 0 {
+		t.Errorf("UnderlyingPrice=%v", r.UnderlyingPrice)
+	}
+	if r.AsOf == "" {
+		t.Error("AsOf empty")
+	}
+	if r.NetChex == nil {
+		t.Error("NetChex nil")
+	}
+	if r.ChexInterpretation == nil {
+		t.Error("ChexInterpretation nil")
+	}
+	if len(r.Strikes) == 0 {
+		t.Fatal("Strikes empty")
+	}
+	s := r.Strikes[0]
+	if s.Strike == nil {
+		t.Error("Strikes[0].Strike nil")
+	}
+	if s.CallChex == nil {
+		t.Error("Strikes[0].CallChex nil")
+	}
+	if s.PutChex == nil {
+		t.Error("Strikes[0].PutChex nil")
+	}
+	if s.NetChex == nil {
+		t.Error("Strikes[0].NetChex nil")
+	}
+}
+
+// TestIntegrationOptionQuote_EveryFieldDeclaredInPocoMustBeReferenced —
+// 100% field-coverage walk against OptionQuote on SPY.
+//
+// Live-mode best-effort fields (referenced but not asserted non-nil):
+//   - SviVol — gated when surface coverage is insufficient (SviVolGated then true)
+//   - Underlying — only present in some response shapes
+//
+// Inputs chosen so a single-object response is returned (all three filters set).
+func TestIntegrationOptionQuote_EveryFieldDeclaredInPocoMustBeReferenced(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	// Pick a near-the-money expiration that always exists. We rely on the
+	// list-shape so we can walk a row without assuming a specific strike.
+	raw, err := client.OptionQuote(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("OptionQuote SPY: %v", err)
+	}
+	// Response is an array on the wire when fewer than 3 filters are set, but
+	// the untyped helper returns a map shape (assume {"quotes":[...]} or
+	// flatten via OptionQuoteTyped's logic). Use the typed wrapper to walk.
+	quotes, err := client.OptionQuoteTyped(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("OptionQuoteTyped SPY: %v", err)
+	}
+	if len(quotes) == 0 {
+		// Some servers wrap singletons — fall back to the raw map.
+		t.Logf("OptionQuoteTyped returned 0 rows; raw keys=%v", raw)
+		t.Fatal("OptionQuoteTyped returned 0 rows")
+	}
+	q := quotes[0]
+	if q.Type == nil {
+		t.Error("Type nil")
+	}
+	if q.Expiry == nil {
+		t.Error("Expiry nil")
+	}
+	if q.Strike == nil {
+		t.Error("Strike nil")
+	}
+	if q.Bid == nil {
+		t.Error("Bid nil")
+	}
+	if q.Ask == nil {
+		t.Error("Ask nil")
+	}
+	if q.Mid == nil {
+		t.Error("Mid nil")
+	}
+	if q.BidSize == nil {
+		t.Error("BidSize nil")
+	}
+	if q.AskSize == nil {
+		t.Error("AskSize nil")
+	}
+	if q.LastUpdate == nil {
+		t.Error("LastUpdate nil")
+	}
+	if q.ImpliedVol == nil {
+		t.Error("ImpliedVol nil")
+	}
+	if q.IvBid == nil {
+		t.Error("IvBid nil")
+	}
+	if q.IvAsk == nil {
+		t.Error("IvAsk nil")
+	}
+	if q.Delta == nil {
+		t.Error("Delta nil")
+	}
+	if q.Gamma == nil {
+		t.Error("Gamma nil")
+	}
+	if q.Theta == nil {
+		t.Error("Theta nil")
+	}
+	if q.Vega == nil {
+		t.Error("Vega nil")
+	}
+	if q.Rho == nil {
+		t.Error("Rho nil")
+	}
+	if q.Vanna == nil {
+		t.Error("Vanna nil")
+	}
+	if q.Charm == nil {
+		t.Error("Charm nil")
+	}
+	if q.SviVolGated == nil {
+		t.Error("SviVolGated nil")
+	}
+	// SviVol may be gated; just reference it.
+	_ = q.SviVol
+	if q.OpenInterest == nil {
+		t.Error("OpenInterest nil")
+	}
+	if q.Volume == nil {
+		t.Error("Volume nil")
+	}
+	// Underlying is optional — only referenced.
+	_ = q.Underlying
+}
+
+// TestIntegrationStockQuote_EveryFieldDeclaredInPocoMustBeReferenced —
+// 100% field-coverage walk against StockQuoteResponse on SPY.
+func TestIntegrationStockQuote_EveryFieldDeclaredInPocoMustBeReferenced(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	r, err := client.StockQuoteTyped(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("StockQuoteTyped SPY: %v", err)
+	}
+	if r.Ticker != "SPY" {
+		t.Errorf("Ticker=%q", r.Ticker)
+	}
+	if r.Bid == nil {
+		t.Error("Bid nil")
+	}
+	if r.Ask == nil {
+		t.Error("Ask nil")
+	}
+	if r.Mid == nil || *r.Mid <= 0 {
+		t.Errorf("Mid=%v", r.Mid)
+	}
+	if r.LastPrice == nil {
+		t.Error("LastPrice nil")
+	}
+	if r.LastUpdate == nil {
+		t.Error("LastUpdate nil")
+	}
+}

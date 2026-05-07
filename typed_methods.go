@@ -299,3 +299,141 @@ func (c *Client) StockQuoteTyped(ctx context.Context, ticker string) (*StockQuot
 	}
 	return out, nil
 }
+
+// IvTyped is the strongly-typed variant of IV. The original IV continues to
+// return map[string]interface{} unchanged.
+//
+// Returns a fully-populated *PricingIvResponse computed from the supplied
+// inputs.
+func (c *Client) IvTyped(ctx context.Context, p IVParams) (*PricingIvResponse, error) {
+	raw, err := c.IV(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	out := &PricingIvResponse{}
+	if err := decodeTyped("iv", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// KellyTyped is the strongly-typed variant of Kelly. The original Kelly
+// continues to return map[string]interface{} unchanged.
+//
+// Returns a fully-populated *PricingKellyResponse computed from the supplied
+// inputs. On negative-EV setups the Sizing fields are all zero and
+// Recommendation explains the no-position outcome.
+func (c *Client) KellyTyped(ctx context.Context, p KellyParams) (*PricingKellyResponse, error) {
+	raw, err := c.Kelly(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	out := &PricingKellyResponse{}
+	if err := decodeTyped("kelly", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AccountTyped is the strongly-typed variant of Account. The original
+// Account continues to return map[string]interface{} unchanged.
+//
+// Returns a fully-populated *AccountResponse for the authenticated user.
+func (c *Client) AccountTyped(ctx context.Context) (*AccountResponse, error) {
+	raw, err := c.Account(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := &AccountResponse{}
+	if err := decodeTyped("account", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// TickersTyped is the strongly-typed variant of Tickers. The original
+// Tickers continues to return map[string]interface{} unchanged.
+//
+// Returns a fully-populated *TickersResponse with the alphabetised ticker
+// list and total count.
+func (c *Client) TickersTyped(ctx context.Context) (*TickersResponse, error) {
+	raw, err := c.Tickers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := &TickersResponse{}
+	if err := decodeTyped("tickers", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SymbolsTyped is the strongly-typed variant of Symbols. The original
+// Symbols continues to return map[string]interface{} unchanged.
+//
+// Returns a fully-populated *SymbolsResponse listing the live in-store
+// symbols plus a refresh timestamp.
+func (c *Client) SymbolsTyped(ctx context.Context) (*SymbolsResponse, error) {
+	raw, err := c.Symbols(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := &SymbolsResponse{}
+	if err := decodeTyped("symbols", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// OptionsTyped is the strongly-typed variant of Options. The original
+// Options continues to return map[string]interface{} unchanged.
+//
+// Returns a fully-populated *OptionsResponse with the listed expirations
+// and per-expiry strike grids for the given ticker.
+func (c *Client) OptionsTyped(ctx context.Context, ticker string) (*OptionsResponse, error) {
+	raw, err := c.Options(ctx, ticker)
+	if err != nil {
+		return nil, err
+	}
+	out := &OptionsResponse{}
+	if err := decodeTyped("options", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// HealthTyped is the strongly-typed variant of Health. The original Health
+// continues to return map[string]interface{} unchanged.
+//
+// Returns a fully-populated *HealthResponse — Status is the literal "ok" on
+// healthy responses.
+func (c *Client) HealthTyped(ctx context.Context) (*HealthResponse, error) {
+	raw, err := c.Health(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := &HealthResponse{}
+	if err := decodeTyped("health", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ScreenerTyped is the strongly-typed variant of Screener. The original
+// Screener continues to return map[string]interface{} unchanged.
+//
+// Returns a fully-populated *ScreenerResponse — Meta has the pagination /
+// universe / tier / as-of metadata; Data is the result rows typed as
+// map[string]any (row columns depend on the request's `select` argument and
+// any defined `formulas`).
+func (c *Client) ScreenerTyped(ctx context.Context, req ScreenerRequest) (*ScreenerResponse, error) {
+	raw, err := c.Screener(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	out := &ScreenerResponse{}
+	if err := decodeTyped("screener", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
