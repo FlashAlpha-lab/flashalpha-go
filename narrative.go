@@ -81,7 +81,7 @@ type NarrativeData struct {
 	// (dealer-side support).
 	PutWall *float64 `json:"put_wall"`
 	// Regime is the dealer-positioning classifier:
-	//   "positive_gamma" | "negative_gamma" | "neutral" | "undetermined"
+	//   "positive_gamma" | "negative_gamma" | "unknown"
 	Regime string `json:"regime"`
 	// ZeroDtePct is the 0DTE share of full-chain net GEX (%).
 	ZeroDtePct *float64 `json:"zero_dte_pct"`
