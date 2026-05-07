@@ -134,3 +134,168 @@ func (c *Client) ExposureSummaryTyped(ctx context.Context, symbol string) (*Expo
 	}
 	return out, nil
 }
+
+// VolatilityTyped is the strongly-typed variant of Volatility. The original
+// Volatility continues to return map[string]interface{} unchanged.
+//
+// Returns a fully-populated *VolatilityResponse for the given symbol.
+func (c *Client) VolatilityTyped(ctx context.Context, symbol string) (*VolatilityResponse, error) {
+	raw, err := c.Volatility(ctx, symbol)
+	if err != nil {
+		return nil, err
+	}
+	out := &VolatilityResponse{}
+	if err := decodeTyped("volatility", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AdvVolatilityTyped is the strongly-typed variant of AdvVolatility. The
+// original AdvVolatility continues to return map[string]interface{} unchanged.
+//
+// Returns a fully-populated *AdvVolatilityResponse for the given symbol.
+func (c *Client) AdvVolatilityTyped(ctx context.Context, symbol string) (*AdvVolatilityResponse, error) {
+	raw, err := c.AdvVolatility(ctx, symbol)
+	if err != nil {
+		return nil, err
+	}
+	out := &AdvVolatilityResponse{}
+	if err := decodeTyped("adv volatility", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SurfaceTyped is the strongly-typed variant of Surface. The original
+// Surface continues to return map[string]interface{} unchanged.
+//
+// Returns a fully-populated *SurfaceResponse for the given symbol.
+func (c *Client) SurfaceTyped(ctx context.Context, symbol string) (*SurfaceResponse, error) {
+	raw, err := c.Surface(ctx, symbol)
+	if err != nil {
+		return nil, err
+	}
+	out := &SurfaceResponse{}
+	if err := decodeTyped("surface", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GexTyped is the strongly-typed variant of Gex. The original Gex continues
+// to return map[string]interface{} unchanged.
+//
+// Returns a fully-populated *GexResponse for the given symbol.
+func (c *Client) GexTyped(ctx context.Context, symbol string, opts ...GexOption) (*GexResponse, error) {
+	raw, err := c.Gex(ctx, symbol, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out := &GexResponse{}
+	if err := decodeTyped("gex", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DexTyped is the strongly-typed variant of Dex. The original Dex continues
+// to return map[string]interface{} unchanged.
+//
+// Returns a fully-populated *DexResponse for the given symbol.
+func (c *Client) DexTyped(ctx context.Context, symbol string, opts ...DexOption) (*DexResponse, error) {
+	raw, err := c.Dex(ctx, symbol, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out := &DexResponse{}
+	if err := decodeTyped("dex", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// VexTyped is the strongly-typed variant of Vex. The original Vex continues
+// to return map[string]interface{} unchanged.
+//
+// Returns a fully-populated *VexResponse for the given symbol.
+func (c *Client) VexTyped(ctx context.Context, symbol string, opts ...VexOption) (*VexResponse, error) {
+	raw, err := c.Vex(ctx, symbol, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out := &VexResponse{}
+	if err := decodeTyped("vex", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ChexTyped is the strongly-typed variant of Chex. The original Chex
+// continues to return map[string]interface{} unchanged.
+//
+// Returns a fully-populated *ChexResponse for the given symbol.
+func (c *Client) ChexTyped(ctx context.Context, symbol string, opts ...ChexOption) (*ChexResponse, error) {
+	raw, err := c.Chex(ctx, symbol, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out := &ChexResponse{}
+	if err := decodeTyped("chex", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// OptionQuoteTyped is the strongly-typed variant of OptionQuote. The
+// original OptionQuote continues to return map[string]interface{} unchanged.
+//
+// The endpoint returns either a single object (when expiry, strike, and
+// type are all supplied) or an array of quotes. To preserve a single typed
+// shape, this wrapper always returns a slice of OptionQuote — single-object
+// responses are wrapped into a 1-element slice. Inspect the underlying
+// shape via OptionQuote(...) when you need to distinguish.
+func (c *Client) OptionQuoteTyped(ctx context.Context, ticker string, opts ...OptionQuoteOption) ([]OptionQuote, error) {
+	raw, err := c.OptionQuote(ctx, ticker, opts...)
+	if err != nil {
+		return nil, err
+	}
+	// The /optionquote endpoint may return either a list or a single
+	// object. The map[string]interface{} return type from the unwrapped
+	// method already discards the outer-array shape, so re-marshal the
+	// raw payload and try both shapes.
+	if quotes, ok := raw["quotes"]; ok {
+		// Shape: { "quotes": [ ... ] } — some servers wrap.
+		buf, mErr := json.Marshal(quotes)
+		if mErr != nil {
+			return nil, fmt.Errorf("flashalpha: re-encode option quote: %w", mErr)
+		}
+		var out []OptionQuote
+		if err := json.Unmarshal(buf, &out); err != nil {
+			return nil, fmt.Errorf("flashalpha: decode option quote: %w", err)
+		}
+		return out, nil
+	}
+	// Single-object shape — decode as one OptionQuote and wrap.
+	single := OptionQuote{}
+	if err := decodeTyped("option quote", raw, &single); err != nil {
+		return nil, err
+	}
+	return []OptionQuote{single}, nil
+}
+
+// StockQuoteTyped is the strongly-typed variant of StockQuote. The original
+// StockQuote continues to return map[string]interface{} unchanged.
+//
+// Returns a fully-populated *StockQuoteResponse for the given ticker.
+func (c *Client) StockQuoteTyped(ctx context.Context, ticker string) (*StockQuoteResponse, error) {
+	raw, err := c.StockQuote(ctx, ticker)
+	if err != nil {
+		return nil, err
+	}
+	out := &StockQuoteResponse{}
+	if err := decodeTyped("stock quote", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
