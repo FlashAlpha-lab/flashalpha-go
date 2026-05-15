@@ -98,8 +98,9 @@ type AdvTotalVarianceSurface struct {
 	Moneyness []float64 `json:"moneyness"`
 	// Expiries are the expiration dates corresponding to the inner axis.
 	Expiries []string `json:"expiries"`
-	// Tenors are the day-count tenors for each expiry (matches Expiries).
-	Tenors []int `json:"tenors"`
+	// Tenors are the year-fraction tenors for each expiry (matches
+	// Expiries) — fractional (e.g. 0.00274 ≈ 1 day), so float64.
+	Tenors []float64 `json:"tenors"`
 	// TotalVariance is the (moneyness × expiry) total-variance grid.
 	TotalVariance [][]float64 `json:"total_variance"`
 	// ImpliedVol is the (moneyness × expiry) implied-vol grid (annualised %).

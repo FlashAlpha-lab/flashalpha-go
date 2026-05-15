@@ -1953,12 +1953,11 @@ func TestIntegrationNarrative_EveryFieldDeclaredInPocoMustBeReferenced(t *testin
 	if d.NetGex == nil {
 		t.Error("Data.NetGex nil")
 	}
-	if d.NetGexPrior == nil {
-		t.Error("Data.NetGexPrior nil")
-	}
-	if d.NetGexChangePct == nil {
-		t.Error("Data.NetGexChangePct nil")
-	}
+	// NetGexPrior / NetGexChangePct are prior-session-dependent and are
+	// legitimately nil when there is no prior-day data (the narrative
+	// prose says so). Reference without asserting non-nil.
+	_ = d.NetGexPrior
+	_ = d.NetGexChangePct
 	if d.Vix == nil {
 		t.Error("Data.Vix nil")
 	}
@@ -2891,25 +2890,59 @@ func TestIntegrationOptionQuote_EveryFieldDeclaredInPocoMustBeReferenced(t *test
 	ctx, cancel := integrationCtx()
 	defer cancel()
 
-	// Pick a near-the-money expiration that always exists. We rely on the
-	// list-shape so we can walk a row without assuming a specific strike.
+	// Validate the ATM contract: the strike nearest spot is the most
+	// reliably-quoted. Deep-OTM / stale listings legitimately have null
+	// greeks (no two-sided market) — a valid API state, so quotes[0] is
+	// not a safe pick.
 	raw, err := client.OptionQuote(ctx, "SPY")
 	if err != nil {
 		t.Fatalf("OptionQuote SPY: %v", err)
 	}
-	// Response is an array on the wire when fewer than 3 filters are set, but
-	// the untyped helper returns a map shape (assume {"quotes":[...]} or
-	// flatten via OptionQuoteTyped's logic). Use the typed wrapper to walk.
 	quotes, err := client.OptionQuoteTyped(ctx, "SPY")
 	if err != nil {
 		t.Fatalf("OptionQuoteTyped SPY: %v", err)
 	}
 	if len(quotes) == 0 {
-		// Some servers wrap singletons — fall back to the raw map.
 		t.Logf("OptionQuoteTyped returned 0 rows; raw keys=%v", raw)
 		t.Fatal("OptionQuoteTyped returned 0 rows")
 	}
-	q := quotes[0]
+
+	sq, err := client.StockQuote(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("StockQuote SPY: %v", err)
+	}
+	spot, _ := sq["mid"].(float64)
+	if spot <= 0 {
+		spot, _ = sq["lastPrice"].(float64)
+	}
+
+	// Pick the ATM contract that actually has a live quote: nearest strike
+	// to spot among rows whose Delta is populated (Delta requires a priced
+	// two-sided market — its presence is the signal of a real quote;
+	// deep-OTM listings legitimately have nil greeks).
+	var q flashalpha.OptionQuote
+	found := false
+	best := -1.0
+	for i := range quotes {
+		// A model-priced quote always carries delta (and the other BSM
+		// greeks). iv_bid / iv_ask are bid/ask-side IVs, legitimately
+		// nil on a one-sided market — select on delta only.
+		if quotes[i].Strike == nil || quotes[i].Delta == nil {
+			continue
+		}
+		d := *quotes[i].Strike - spot
+		if d < 0 {
+			d = -d
+		}
+		if !found || best < 0 || d < best {
+			best = d
+			q = quotes[i]
+			found = true
+		}
+	}
+	if !found {
+		t.Skip("no SPY option contract returned a live (Delta-populated) quote")
+	}
 	if q.Type == nil {
 		t.Error("Type nil")
 	}
@@ -2940,12 +2973,10 @@ func TestIntegrationOptionQuote_EveryFieldDeclaredInPocoMustBeReferenced(t *test
 	if q.ImpliedVol == nil {
 		t.Error("ImpliedVol nil")
 	}
-	if q.IvBid == nil {
-		t.Error("IvBid nil")
-	}
-	if q.IvAsk == nil {
-		t.Error("IvAsk nil")
-	}
+	// IvBid / IvAsk are bid/ask-side IVs — legitimately nil when that
+	// side has no market. Reference without asserting non-nil.
+	_ = q.IvBid
+	_ = q.IvAsk
 	if q.Delta == nil {
 		t.Error("Delta nil")
 	}
@@ -2967,11 +2998,11 @@ func TestIntegrationOptionQuote_EveryFieldDeclaredInPocoMustBeReferenced(t *test
 	if q.Charm == nil {
 		t.Error("Charm nil")
 	}
-	if q.SviVolGated == nil {
-		t.Error("SviVolGated nil")
-	}
-	// SviVol may be gated; just reference it.
+	// SviVol / SviVolGated are conditionally null: svi_vol_gated is the
+	// gating-reason string and is null when the SVI vol is NOT gated
+	// (the common case). Reference both without asserting non-null.
 	_ = q.SviVol
+	_ = q.SviVolGated
 	if q.OpenInterest == nil {
 		t.Error("OpenInterest nil")
 	}

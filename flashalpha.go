@@ -241,18 +241,6 @@ func WithStrikeRange(r float64) ZeroDteOption {
 	return func(c *zeroDteConfig) { c.strikeRange = &r }
 }
 
-// HistoryOption configures an ExposureHistory request.
-type HistoryOption func(*historyConfig)
-
-type historyConfig struct {
-	days *int
-}
-
-// WithDays sets the number of historical days to retrieve.
-func WithDays(days int) HistoryOption {
-	return func(c *historyConfig) { c.days = &days }
-}
-
 // OptionQuoteOption configures an OptionQuote request.
 type OptionQuoteOption func(*optionQuoteConfig)
 
@@ -432,20 +420,6 @@ func (c *Client) ZeroDte(ctx context.Context, symbol string, opts ...ZeroDteOpti
 		params.Set("strike_range", strconv.FormatFloat(*cfg.strikeRange, 'f', -1, 64))
 	}
 	return c.get(ctx, "/v1/exposure/zero-dte/"+seg(symbol), params)
-}
-
-// ExposureHistory returns daily exposure snapshots for trend analysis.
-// Requires Growth+ plan. Optional: WithDays.
-func (c *Client) ExposureHistory(ctx context.Context, symbol string, opts ...HistoryOption) (map[string]interface{}, error) {
-	cfg := &historyConfig{}
-	for _, o := range opts {
-		o(cfg)
-	}
-	params := url.Values{}
-	if cfg.days != nil {
-		params.Set("days", strconv.Itoa(*cfg.days))
-	}
-	return c.get(ctx, "/v1/exposure/history/"+seg(symbol), params)
 }
 
 // ── Market Data ───────────────────────────────────────────────────────────────

@@ -114,7 +114,35 @@ All methods take `context.Context` as the first argument and return
 | `Narrative(ctx, symbol)` | Verbal narrative analysis of exposure | Growth+ |
 | `ZeroDte(ctx, symbol, ...ZeroDteOption)` | 0DTE regime, expected move, pin risk | Growth+ |
 | `MaxPain(ctx, symbol, ...MaxPainOption)` | Max pain analysis with dealer alignment, pain curve, pin probability | Growth+ |
-| `ExposureHistory(ctx, symbol, ...HistoryOption)` | Daily exposure trend snapshots | Growth+ |
+
+### Flow (live, simulation-aware) — requires the Alpha plan
+
+Each method has a strongly-typed `*Typed` variant (e.g. `FlowLevelsTyped`).
+
+| Method | Description |
+|--------|-------------|
+| `FlowLevels(ctx, symbol, ...FlowOption)` | Live gamma flip / call & put walls / max pain |
+| `FlowPinRisk(ctx, symbol, ...FlowOption)` | 0DTE pin-risk score + component breakdown |
+| `FlowSummary(ctx, symbol, ...FlowOption)` | At-a-glance flow direction + headline GEX shift |
+| `FlowOi(ctx, symbol, ...FlowOption)` | Open-interest simulator state (official vs intraday) |
+| `FlowGex(ctx, symbol, ...FlowOption)` | Live (flow-adjusted) GEX + per-strike profile |
+| `FlowDex(ctx, symbol, ...FlowOption)` | Live (flow-adjusted) DEX + per-strike profile |
+| `FlowDealerRisk(ctx, symbol, ...FlowOption)` | Settled-vs-live dealer GEX/DEX + flow adjustment |
+| `FlowLive(ctx, symbol, ...FlowOption)` | Everything-at-once live flow bundle |
+| `FlowOptionRecent(ctx, symbol, ...FlowOption)` | Recent option trades, newest-first |
+| `FlowOptionSummary(ctx, symbol, ...FlowOption)` | Per-underlying option-flow aggregates |
+| `FlowOptionBlocks(ctx, symbol, ...FlowOption)` | Large option prints (`size >= minSize`) |
+| `FlowOptionHistory(ctx, symbol, ...FlowOption)` | Per-minute option-flow buckets |
+| `FlowOptionCumulative(ctx, symbol, ...FlowOption)` | Cumulative option net-flow series |
+| `FlowStockRecent(ctx, symbol, ...FlowOption)` | Recent stock trades, newest-first |
+| `FlowStockSummary(ctx, symbol)` | Per-symbol stock-flow aggregates |
+| `FlowStockBlocks(ctx, symbol, ...FlowOption)` | Large stock prints (`size >= minSize`) |
+| `FlowStockHistory(ctx, symbol, ...FlowOption)` | Per-minute stock-flow buckets w/ OHLC |
+| `FlowStockCumulative(ctx, symbol, ...FlowOption)` | Cumulative stock net-flow series |
+| `FlowOptionsLeaderboard(ctx, ...FlowOption)` | Cross-symbol option-flow leaderboard |
+| `FlowOptionsOutliers(ctx, ...FlowOption)` | Cross-symbol option-flow outliers |
+| `FlowStocksLeaderboard(ctx, ...FlowOption)` | Cross-symbol stock-flow leaderboard |
+| `FlowStocksOutliers(ctx, ...FlowOption)` | Cross-symbol stock-flow outliers |
 
 ### Market Data
 
@@ -182,11 +210,6 @@ dex, err := client.Dex(ctx, "QQQ",
 // 0DTE analytics with custom strike range
 dte, err := client.ZeroDte(ctx, "SPY",
     flashalpha.WithStrikeRange(0.05),
-)
-
-// Historical exposure with 30-day lookback
-hist, err := client.ExposureHistory(ctx, "SPY",
-    flashalpha.WithDays(30),
 )
 
 // Option quote filtered by expiry, strike, and type

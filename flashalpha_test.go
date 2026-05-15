@@ -685,19 +685,6 @@ func TestZeroDteWithStrikeRange(t *testing.T) {
 	}
 }
 
-func TestExposureHistory(t *testing.T) {
-	_, client, cap := newCapturingServer(t, 200, map[string]interface{}{"history": []interface{}{}})
-	_, err := client.ExposureHistory(context.Background(), "SPY", flashalpha.WithDays(30))
-	if err != nil {
-		t.Fatalf("ExposureHistory: %v", err)
-	}
-	if cap.Path != "/v1/exposure/history/SPY" {
-		t.Errorf("ExposureHistory path = %q", cap.Path)
-	}
-	if !strings.Contains(cap.Query, "days=30") {
-		t.Errorf("ExposureHistory query = %q, want days=30", cap.Query)
-	}
-}
 
 // ── Market data ───────────────────────────────────────────────────────────────
 
