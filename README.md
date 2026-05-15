@@ -8,6 +8,8 @@ and custom formulas), gamma exposure (GEX), delta exposure (DEX), vanna and
 charm exposure, volatility surfaces, 0DTE analytics, and Black-Scholes-Merton
 pricing utilities — all via a simple REST API.
 
+> 🔑 **[Get a free API key at flashalpha.com →](https://flashalpha.com)** · 📚 [API documentation](https://flashalpha.com/docs) · 💹 [FlashAlpha options analytics API](https://flashalpha.com)
+
 ## Installation
 
 Requires Go 1.21 or later. No external dependencies.
