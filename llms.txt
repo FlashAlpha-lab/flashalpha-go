@@ -24,12 +24,13 @@ This SDK gives Go applications and AI agents direct access to that data. Every e
 - `Volatility / AdvVolatility(ctx, symbol)` — IV ladder, skew, term structure, SVI calibration, variance-swap pricing.
 - `Greeks / IV / Kelly(ctx, params)` — Black-Scholes-Merton calculator: theoretical price, full first/second/third-order greeks, implied vol from market price, Kelly-criterion sizing.
 - `Screener(ctx, request)` — live options screener — filter and rank by GEX, VRP, harvest scores, custom formulas (Growth+ for 10-symbol universe; Alpha+ for ~250 symbols, formulas, harvest/dealer-flow-risk scores).
+- **Flow — live, simulation-aware (Alpha+):** intraday trade-tape-adjusted dealer exposure + the raw options/stock flow feed, 22 endpoints. Analytics: `FlowLevels` / `FlowPinRisk` / `FlowSummary` / `FlowOi` / `FlowGex` / `FlowDex` / `FlowDealerRisk` / `FlowLive` — live gamma flip / walls / max pain, 0DTE pin score, flow direction + GEX shift, OI simulator state, flow-adjusted GEX/DEX, settled-vs-live dealer risk, all-in-one bundle. Raw: `FlowOptionRecent|Summary|Blocks|History|Cumulative`, the `FlowStock*` equivalents, and `FlowOptionsLeaderboard|Outliers` / `FlowStocksLeaderboard|Outliers`. Every method has a strongly-typed `*Typed` variant (e.g. `FlowLevelsTyped`).
 
 ## Tier breakdown
 
 - **Free**: GEX/DEX/VEX/CHEX, ExposureLevels, StockQuote, OptionQuote, Surface, StockSummary, BSM Greeks/IV, Tickers, Options, Symbols, Health, Account, Historical stock/option quotes.
-- **Growth**: + ExposureSummary, Narrative, ZeroDte, ExposureHistory, MaxPain, Volatility, Kelly, Screener (10-symbol universe).
-- **Alpha**: + AdvVolatility, Vrp, Screener (full ~250-symbol universe with formulas, harvest scores, dealer-flow-risk scores).
+- **Growth**: + ExposureSummary, Narrative, ZeroDte, MaxPain, Volatility, Kelly, Screener (10-symbol universe).
+- **Alpha**: + AdvVolatility, Vrp, the full `Flow*` tier (22 endpoints), Screener (full ~250-symbol universe with formulas, harvest scores, dealer-flow-risk scores).
 
 ## Authentication
 
