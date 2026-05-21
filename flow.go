@@ -40,6 +40,9 @@ type flowConfig struct {
 	n             *int
 	windowMinutes *int
 	minTrades     *int
+	minScore      *int
+	intent        string
+	structure     string
 }
 
 // WithFlowExpiry slices a flow request to a single expiration cycle
@@ -80,6 +83,23 @@ func WithFlowWindowMinutes(windowMinutes int) FlowOption {
 // the outliers endpoints.
 func WithFlowMinTrades(minTrades int) FlowOption {
 	return func(c *flowConfig) { c.minTrades = &minTrades }
+}
+
+// WithFlowMinScore drops signals below this 0–100 threshold on the
+// FlowSignals endpoint.
+func WithFlowMinScore(minScore int) FlowOption {
+	return func(c *flowConfig) { c.minScore = &minScore }
+}
+
+// WithFlowIntent filters the FlowSignals feed to "bullish", "bearish", or
+// "neutral".
+func WithFlowIntent(intent string) FlowOption {
+	return func(c *flowConfig) { c.intent = intent }
+}
+
+// WithFlowStructure filters the FlowSignals feed to "block" or "sweep".
+func WithFlowStructure(structure string) FlowOption {
+	return func(c *flowConfig) { c.structure = structure }
 }
 
 func flowParams(opts []FlowOption) (*flowConfig, url.Values) {
@@ -829,6 +849,196 @@ type FlowStockOutliersResponse struct {
 	Outliers []FlowOutlierRow `json:"outliers"`
 }
 
+// ── Flow signals (unusual-flow feed, Alpha+) ─────────────────────────────────
+//
+// Per-underlying scored/classified unusual-flow signals. Snake_case wire
+// shape (analytics family). Both endpoints reuse FlowSignal.
+
+// FlowSignalsChain is the settled-chain reference levels echoed alongside the
+// signals. Computed once per request from the settled snapshot — independent
+// of the live flow surface. All fields are nil when the chain snapshot is
+// unavailable.
+type FlowSignalsChain struct {
+	// CallWall is the strike with the largest settled call GEX —
+	// upside dealer-defended level.
+	CallWall *float64 `json:"call_wall"`
+	// PutWall is the strike with the largest settled put GEX —
+	// downside dealer-defended level.
+	PutWall *float64 `json:"put_wall"`
+	// MaxPain is the strike where total option-holder loss is maximized
+	// at expiry.
+	MaxPain *float64 `json:"max_pain"`
+	// GammaFlip is the settled gamma-flip strike (sign change of net
+	// GEX across the chain).
+	GammaFlip *float64 `json:"gamma_flip"`
+}
+
+// FlowSignalScoreBreakdown is the component contributions that sum to the
+// headline Score. Weights are server-tunable so absolute values may shift,
+// but the ordering of components is stable.
+type FlowSignalScoreBreakdown struct {
+	// Premium is the premium-size contribution (the larger the dollar
+	// premium, the more points).
+	Premium *int `json:"premium"`
+	// SizeVsOi is the print size contribution relative to the
+	// contract's open interest.
+	SizeVsOi *int `json:"size_vs_oi"`
+	// Aggressor is the NBBO aggressor-strength contribution —
+	// above-ask / at-ask earn more than mid.
+	Aggressor *int `json:"aggressor"`
+	// Sweep is the sweep boost (≥2 same-side prints on one contract
+	// within ~500ms).
+	Sweep *int `json:"sweep"`
+	// OpeningBias is the OI-simulator opening-bias contribution.
+	OpeningBias *int `json:"opening_bias"`
+	// Tenor is the DTE contribution — short-dated prints score
+	// differently than long-dated.
+	Tenor *int `json:"tenor"`
+}
+
+// FlowSignalEnrichment is the chain-derived context attached to a signal.
+// All numeric fields are nil and Moneyness is "unknown" when the contract
+// isn't in the settled chain snapshot.
+type FlowSignalEnrichment struct {
+	// Iv is the contract implied vol (decimal, e.g. 0.62 = 62%).
+	Iv *float64 `json:"iv"`
+	// Delta is the contract delta (signed; positive for calls, negative
+	// for puts).
+	Delta *float64 `json:"delta"`
+	// Gamma is the contract gamma (per-share).
+	Gamma *float64 `json:"gamma"`
+	// IvVsAtm is IV minus the nearest ATM IV (signed).
+	IvVsAtm *float64 `json:"iv_vs_atm"`
+	// Moneyness is "OTM" / "ATM" / "ITM" / "unknown".
+	Moneyness string `json:"moneyness"`
+	// EstimatedDeltaNotional is the estimated dollar delta-notional of this
+	// print.
+	EstimatedDeltaNotional *float64 `json:"estimated_delta_notional"`
+	// HypotheticalGexImpactIfOpening is the standalone gamma-$ this print
+	// would add if it were opening and fully dealer-absorbed. NOT applied to
+	// the live chain — don't sum it against /v1/flow/gex.
+	HypotheticalGexImpactIfOpening *float64 `json:"hypothetical_gex_impact_if_opening"`
+}
+
+// FlowSignal is one scored unusual-flow signal — a coalesced view of one
+// notable (block-sized) print on a single contract. Same shape across
+// GET /v1/flow/signals/{symbol} and the TopSignals array of
+// GET /v1/flow/signals/{symbol}/summary.
+type FlowSignal struct {
+	// Ts is the trade timestamp (ISO-8601 UTC).
+	Ts string `json:"ts"`
+	// Expiry is the contract expiry (YYYY-MM-DD).
+	Expiry string `json:"expiry"`
+	// Strike is the contract strike price.
+	Strike *float64 `json:"strike"`
+	// Right is "C" (call) or "P" (put).
+	Right string `json:"right"`
+	// Side is the upstream buy/sell/mid aggressor classification (distinct
+	// from the NBBO Aggressor label).
+	Side string `json:"side"`
+	// Price is the trade price.
+	Price *float64 `json:"price"`
+	// Size is the trade size in contracts.
+	Size *int64 `json:"size"`
+	// Premium is the dollar premium of this print: Price * Size * 100.
+	Premium *float64 `json:"premium"`
+	// Dte is days to expiry at trade time.
+	Dte *int `json:"dte"`
+	// Structure is "block" (lone block-sized print) or "sweep" (≥2
+	// same-side prints on one contract within ~500ms).
+	Structure string `json:"structure"`
+	// Aggressor is the NBBO position at trade: "above_ask" / "at_ask" /
+	// "mid" / "at_bid" / "below_bid".
+	Aggressor string `json:"aggressor"`
+	// OpenCloseBias is a contract-level OI-simulator inference:
+	// "opening_bias" / "closing_bias" / "unknown". Not a per-print label.
+	OpenCloseBias string `json:"open_close_bias"`
+	// OpenCloseConfidence is the simulator confidence weight for the bias
+	// above.
+	OpenCloseConfidence *float64 `json:"open_close_confidence"`
+	// ContractNetOiDelta is the signed simulator estimate of contracts
+	// opened (+) or closed (−) today on this contract.
+	ContractNetOiDelta *int64 `json:"contract_net_oi_delta"`
+	// Intent is "bullish" / "bearish" / "neutral". Neutral whenever
+	// OpenCloseBias == "closing_bias" (can't attribute on unwinds) or
+	// Side == "mid".
+	Intent string `json:"intent"`
+	// Score is the 0–100 composite (ScoreBreakdown components sum to this).
+	Score *int `json:"score"`
+	// Conviction is "low" / "medium" / "high".
+	Conviction string `json:"conviction"`
+	// Tags is a subset of "sweep", "block", "opening", "closing", "0dte",
+	// "whale" (premium ≥ $1M), "golden" (top decile in this response set
+	// AND score ≥ 70 absolute).
+	Tags []string `json:"tags"`
+	// ScoreBreakdown is the score component contributions — they sum
+	// to Score.
+	ScoreBreakdown *FlowSignalScoreBreakdown `json:"score_breakdown"`
+	// Enrichment is the chain-derived context (greeks, moneyness,
+	// estimated delta-notional).
+	Enrichment *FlowSignalEnrichment `json:"enrichment"`
+}
+
+// FlowSignalsResponse is the typed body of GET /v1/flow/signals/{symbol}:
+// the scored, classified unusual-flow feed. Each notable print in the
+// look-back window is coalesced into a signal, scored 0–100, and ranked
+// highest score first. Requires the Alpha plan.
+type FlowSignalsResponse struct {
+	// Symbol is the underlying ticker echoed from the request path.
+	Symbol string `json:"symbol"`
+	// AsOf is the timestamp this snapshot was computed for (ISO-8601 UTC).
+	AsOf string `json:"as_of"`
+	// WindowMinutes is the look-back window applied (minutes).
+	WindowMinutes *int `json:"window_minutes"`
+	// Expiry is the expiration filter echoed back, or nil.
+	Expiry *string `json:"expiry"`
+	// UnderlyingPrice is the spot mid at the snapshot time.
+	UnderlyingPrice *float64 `json:"underlying_price"`
+	// Chain is the settled-chain reference levels (computed once per
+	// request).
+	Chain *FlowSignalsChain `json:"chain"`
+	// Count is the number of signals returned after server-side filtering.
+	Count *int `json:"count"`
+	// Signals are returned highest score first.
+	Signals []FlowSignal `json:"signals"`
+}
+
+// FlowSignalsSummaryResponse is the typed body of
+// GET /v1/flow/signals/{symbol}/summary: the net-directional roll-up. Sums
+// classified premium across the window into bullish/bearish and
+// opening/closing buckets — a cheap "smart-money tilt" read for one
+// underlying. Requires the Alpha plan.
+type FlowSignalsSummaryResponse struct {
+	// Symbol is the underlying ticker echoed from the request path.
+	Symbol string `json:"symbol"`
+	// AsOf is the timestamp this snapshot was computed for (ISO-8601 UTC).
+	AsOf string `json:"as_of"`
+	// WindowMinutes is the look-back window applied (minutes).
+	WindowMinutes *int `json:"window_minutes"`
+	// Expiry is the expiration filter echoed back, or nil.
+	Expiry *string `json:"expiry"`
+	// UnderlyingPrice is the spot mid at the snapshot time.
+	UnderlyingPrice *float64 `json:"underlying_price"`
+	// SignalCount is the total signal count in the window (full count, not
+	// the TopSignals length).
+	SignalCount *int `json:"signal_count"`
+	// BullishPremium is the sum of signal premium with Intent == "bullish".
+	BullishPremium *float64 `json:"bullish_premium"`
+	// BearishPremium is the sum of signal premium with Intent == "bearish".
+	BearishPremium *float64 `json:"bearish_premium"`
+	// NetDirectionalPremium is BullishPremium - BearishPremium.
+	NetDirectionalPremium *float64 `json:"net_directional_premium"`
+	// OpeningPremium is the sum of signal premium with OpenCloseBias ==
+	// "opening_bias".
+	OpeningPremium *float64 `json:"opening_premium"`
+	// ClosingPremium is the sum of signal premium with OpenCloseBias ==
+	// "closing_bias".
+	ClosingPremium *float64 `json:"closing_premium"`
+	// TopSignals is the highest-scoring signals (≤ 10). Same shape as
+	// FlowSignal.
+	TopSignals []FlowSignal `json:"top_signals"`
+}
+
 // ── Untyped client methods (map[string]interface{}) ──────────────────────────
 
 // FlowLevels returns live gamma flip / call & put walls / max pain.
@@ -1077,6 +1287,47 @@ func (c *Client) FlowStocksOutliers(ctx context.Context, opts ...FlowOption) (ma
 		params.Set("windowMinutes", strconv.Itoa(*cfg.windowMinutes))
 	}
 	return c.get(ctx, "/v1/flow/stocks/outliers", params)
+}
+
+// FlowSignals returns the scored, classified unusual-flow feed for one
+// underlying. Requires the Alpha plan. Optional: WithFlowMinScore,
+// WithFlowIntent, WithFlowStructure, WithFlowWindowMinutes, WithFlowLimit
+// (1–500), WithFlowExpiry.
+func (c *Client) FlowSignals(ctx context.Context, symbol string, opts ...FlowOption) (map[string]interface{}, error) {
+	cfg, params := flowParams(opts)
+	if cfg.minScore != nil {
+		params.Set("minScore", strconv.Itoa(*cfg.minScore))
+	}
+	if cfg.intent != "" {
+		params.Set("intent", cfg.intent)
+	}
+	if cfg.structure != "" {
+		params.Set("structure", cfg.structure)
+	}
+	if cfg.windowMinutes != nil {
+		params.Set("windowMinutes", strconv.Itoa(*cfg.windowMinutes))
+	}
+	if cfg.limit != nil {
+		params.Set("limit", strconv.Itoa(*cfg.limit))
+	}
+	if cfg.expiry != "" {
+		params.Set("expiry", cfg.expiry)
+	}
+	return c.get(ctx, "/v1/flow/signals/"+seg(symbol), params)
+}
+
+// FlowSignalsSummary returns the net bullish/bearish + opening/closing
+// premium roll-up plus the top 10 signals. Requires the Alpha plan.
+// Optional: WithFlowWindowMinutes, WithFlowExpiry.
+func (c *Client) FlowSignalsSummary(ctx context.Context, symbol string, opts ...FlowOption) (map[string]interface{}, error) {
+	cfg, params := flowParams(opts)
+	if cfg.windowMinutes != nil {
+		params.Set("windowMinutes", strconv.Itoa(*cfg.windowMinutes))
+	}
+	if cfg.expiry != "" {
+		params.Set("expiry", cfg.expiry)
+	}
+	return c.get(ctx, "/v1/flow/signals/"+seg(symbol)+"/summary", params)
 }
 
 // ── Strongly-typed wrappers ──────────────────────────────────────────────────
@@ -1368,6 +1619,32 @@ func (c *Client) FlowStocksOutliersTyped(ctx context.Context, opts ...FlowOption
 	}
 	out := &FlowStockOutliersResponse{}
 	if err := decodeTyped("flow stocks outliers", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// FlowSignalsTyped is the strongly-typed variant of FlowSignals.
+func (c *Client) FlowSignalsTyped(ctx context.Context, symbol string, opts ...FlowOption) (*FlowSignalsResponse, error) {
+	raw, err := c.FlowSignals(ctx, symbol, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out := &FlowSignalsResponse{}
+	if err := decodeTyped("flow signals", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// FlowSignalsSummaryTyped is the strongly-typed variant of FlowSignalsSummary.
+func (c *Client) FlowSignalsSummaryTyped(ctx context.Context, symbol string, opts ...FlowOption) (*FlowSignalsSummaryResponse, error) {
+	raw, err := c.FlowSignalsSummary(ctx, symbol, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out := &FlowSignalsSummaryResponse{}
+	if err := decodeTyped("flow signals summary", raw, out); err != nil {
 		return nil, err
 	}
 	return out, nil

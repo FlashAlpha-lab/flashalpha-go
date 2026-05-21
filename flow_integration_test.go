@@ -407,6 +407,60 @@ func TestIntegrationFlowStocksOutliers(t *testing.T) {
 	}
 }
 
+var signalFields = []string{"ts", "expiry", "strike", "right", "side", "price",
+	"size", "premium", "dte", "structure", "aggressor", "open_close_bias",
+	"open_close_confidence", "contract_net_oi_delta", "intent", "score",
+	"conviction", "tags", "score_breakdown", "enrichment"}
+
+func TestIntegrationFlowSignals(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+	r, err := client.FlowSignals(ctx, flowSym,
+		flashalpha.WithFlowWindowMinutes(240), flashalpha.WithFlowLimit(10))
+	if err != nil {
+		t.Fatalf("FlowSignals: %v", err)
+	}
+	requireKeys(t, r, []string{"symbol", "as_of", "window_minutes", "expiry",
+		"underlying_price", "chain", "count", "signals"}, "flow/signals")
+	if chain, ok := r["chain"].(map[string]interface{}); ok {
+		requireKeys(t, chain, []string{"call_wall", "put_wall", "max_pain",
+			"gamma_flip"}, "flow/signals.chain")
+	}
+	if el, ok := firstElem(r, "signals"); ok {
+		requireKeys(t, el, signalFields, "flow/signals.signals[0]")
+		if br, ok := el["score_breakdown"].(map[string]interface{}); ok {
+			requireKeys(t, br, []string{"premium", "size_vs_oi", "aggressor",
+				"sweep", "opening_bias", "tenor"},
+				"flow/signals.signals[0].score_breakdown")
+		}
+		if en, ok := el["enrichment"].(map[string]interface{}); ok {
+			requireKeys(t, en, []string{"iv", "delta", "gamma", "iv_vs_atm",
+				"moneyness", "estimated_delta_notional",
+				"hypothetical_gex_impact_if_opening"},
+				"flow/signals.signals[0].enrichment")
+		}
+	}
+}
+
+func TestIntegrationFlowSignalsSummary(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+	r, err := client.FlowSignalsSummary(ctx, flowSym,
+		flashalpha.WithFlowWindowMinutes(240))
+	if err != nil {
+		t.Fatalf("FlowSignalsSummary: %v", err)
+	}
+	requireKeys(t, r, []string{"symbol", "as_of", "window_minutes", "expiry",
+		"underlying_price", "signal_count", "bullish_premium",
+		"bearish_premium", "net_directional_premium", "opening_premium",
+		"closing_premium", "top_signals"}, "flow/signals/summary")
+	if el, ok := firstElem(r, "top_signals"); ok {
+		requireKeys(t, el, signalFields, "flow/signals/summary.top_signals[0]")
+	}
+}
+
 // Ensure the typed wrappers decode without error against the live API.
 func TestIntegrationFlowTypedSmoke(t *testing.T) {
 	client := newIntegrationClient(t)

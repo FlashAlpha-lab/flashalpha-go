@@ -131,6 +131,8 @@ Each method has a strongly-typed `*Typed` variant (e.g. `FlowLevelsTyped`).
 | `FlowDex(ctx, symbol, ...FlowOption)` | Live (flow-adjusted) DEX + per-strike profile |
 | `FlowDealerRisk(ctx, symbol, ...FlowOption)` | Settled-vs-live dealer GEX/DEX + flow adjustment |
 | `FlowLive(ctx, symbol, ...FlowOption)` | Everything-at-once live flow bundle |
+| `FlowSignals(ctx, symbol, ...FlowOption)` | Scored, classified unusual-flow feed (block/sweep, intent, 0-100 score) |
+| `FlowSignalsSummary(ctx, symbol, ...FlowOption)` | Net bullish/bearish + opening/closing premium roll-up + top 10 signals |
 | `FlowOptionRecent(ctx, symbol, ...FlowOption)` | Recent option trades, newest-first |
 | `FlowOptionSummary(ctx, symbol, ...FlowOption)` | Per-underlying option-flow aggregates |
 | `FlowOptionBlocks(ctx, symbol, ...FlowOption)` | Large option prints (`size >= minSize`) |
