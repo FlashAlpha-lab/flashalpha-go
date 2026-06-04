@@ -341,3 +341,17 @@ MIT. See [LICENSE](LICENSE).
 - [0DTE Options Analytics](https://github.com/FlashAlpha-lab/0dte-options-analytics) — 0DTE pin risk, expected move, dealer hedging
 - [Volatility Surface Python](https://github.com/FlashAlpha-lab/volatility-surface-python) — SVI calibration, variance swap, skew analysis
 - [Awesome Options Analytics](https://github.com/FlashAlpha-lab/awesome-options-analytics) — curated resource list
+
+## What the Alpha tier unlocks
+
+Free and entry tiers cover live exposure analytics. The **Alpha tier ($1,499/mo)**
+adds the data you cannot get anywhere else:
+
+- **Aggregate vanna and charm exposure.** FlashAlpha is the only public source for
+  these dealer-positioning aggregates.
+- **Point-in-time replay since 2018.** Backtest and trade the same code, with no
+  look-ahead and no training-serving skew.
+- **SVI vol surfaces, VRP analytics, higher-order Greeks**, uncached and unlimited.
+
+Built for quants, prop desks, and vol funds. See the full picture and get a key:
+**[flashalpha.com/for-quant-teams](https://flashalpha.com/for-quant-teams?utm_source=github&utm_medium=readme&utm_campaign=repo-flashalpha-go)**
