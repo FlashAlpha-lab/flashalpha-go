@@ -3043,3 +3043,99 @@ func TestIntegrationStockQuote_EveryFieldDeclaredInPocoMustBeReferenced(t *testi
 		t.Error("LastUpdate nil")
 	}
 }
+
+// ── volatility/realized + volatility/forecast (Alpha+) ───────────────────────
+// Live coverage for the dedicated range-based realized-vol and conditional
+// vol-forecast endpoints. Both decode into typed structs; assert the structural
+// scalars and at least one populated estimator leaf on a liquid name.
+
+func TestIntegrationRealizedVolatility_EveryFieldDeclaredInPocoMustBeReferenced(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	r, err := client.RealizedVolatility(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("RealizedVolatility SPY: %v", err)
+	}
+	if r.Symbol != "SPY" {
+		t.Errorf("Symbol=%q", r.Symbol)
+	}
+	if r.AsOf == "" {
+		t.Error("AsOf empty")
+	}
+	_ = r.UnderlyingPrice
+
+	// Five fixed estimators, each over the 10/20/30-day windows. On a liquid
+	// name every window leaf should be populated for the close-to-close
+	// estimator; the others are referenced to guarantee the struct maps.
+	est := r.Estimators
+	for label, w := range map[string]flashalpha.RealizedVolWindows{
+		"CloseToClose":   est.CloseToClose,
+		"Parkinson":      est.Parkinson,
+		"GarmanKlass":    est.GarmanKlass,
+		"RogersSatchell": est.RogersSatchell,
+		"YangZhang":      est.YangZhang,
+	} {
+		_ = w.Rv10
+		_ = w.Rv20
+		_ = w.Rv30
+		_ = label
+	}
+	if est.CloseToClose.Rv20 == nil {
+		t.Error("Estimators.CloseToClose.Rv20 nil on liquid name")
+	}
+}
+
+func TestIntegrationVolatilityForecast_EveryFieldDeclaredInPocoMustBeReferenced(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+
+	r, err := client.VolatilityForecast(ctx, "SPY")
+	if err != nil {
+		t.Fatalf("VolatilityForecast SPY: %v", err)
+	}
+	if r.Symbol != "SPY" {
+		t.Errorf("Symbol=%q", r.Symbol)
+	}
+	if r.AsOf == "" {
+		t.Error("AsOf empty")
+	}
+
+	// EWMA block
+	if r.Ewma.Lambda <= 0 {
+		t.Errorf("Ewma.Lambda=%v", r.Ewma.Lambda)
+	}
+	if r.Ewma.VolAnnualized <= 0 {
+		t.Errorf("Ewma.VolAnnualized=%v", r.Ewma.VolAnnualized)
+	}
+	_ = r.Ewma.NextDayForecast
+
+	// HAR-RV block + component breakdown
+	if r.HarRv.VolAnnualized <= 0 {
+		t.Errorf("HarRv.VolAnnualized=%v", r.HarRv.VolAnnualized)
+	}
+	_ = r.HarRv.NextDayForecast
+	_ = r.HarRv.Components.Daily
+	_ = r.HarRv.Components.Weekly
+	_ = r.HarRv.Components.Monthly
+
+	// GARCH(1,1) block
+	if r.Garch.Model == "" {
+		t.Error("Garch.Model empty")
+	}
+	_ = r.Garch.Distribution
+	_ = r.Garch.Params.Omega
+	_ = r.Garch.Params.Alpha
+	_ = r.Garch.Params.Beta
+	_ = r.Garch.Params.Dof
+	_ = r.Garch.Persistence
+	_ = r.Garch.LongRunVolAnnualized
+	_ = r.Garch.HalfLifeDays
+	_ = r.Garch.Converged
+	for _, h := range r.Garch.Forecast {
+		_ = h.HorizonDays
+		_ = h.VolAnnualized
+	}
+}
