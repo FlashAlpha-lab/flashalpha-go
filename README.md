@@ -83,6 +83,46 @@ func main() {
 }
 ```
 
+## Strategy signals, earnings, and structures
+
+The SDK covers the full FlashAlpha analytics surface — actionable **strategy
+signals**, **earnings analytics**, and multi-leg **structure** pricing:
+
+```go
+// Strategy signal — one typed decision envelope (StrategyDecisionResponse)
+// shared by all 10 strategy endpoints.
+sig, err := client.StrategyVolCarry(ctx, "SPY",
+    flashalpha.WithStrategyExpiry("2026-06-19"),
+    flashalpha.WithStrategyMinCredit(0.50),
+)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("%s: decision=%s score=%d regime=%s\n",
+    sig.Strategy, sig.Decision, sig.Score, sig.Regime)
+
+// Earnings — straddle-implied expected move into the print
+em, err := client.EarningsExpectedMoveTyped(ctx, "NVDA")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("earnings on %s, expected move block: %+v\n",
+    em.EarningsDate, em.ExpectedMove)
+
+// Multi-leg structure — payoff curve for an arbitrary spread (pure math)
+pnl, err := client.StructurePnlTyped(ctx, flashalpha.StructurePnlRequest{
+    Legs: []flashalpha.StructurePnlLeg{
+        {Action: "buy", Type: "call", Strike: 455, Premium: 6.20, Quantity: 1},
+        {Action: "sell", Type: "call", Strike: 465, Premium: 2.10, Quantity: 1},
+    },
+})
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("breakevens=%v max_profit=%v max_loss=%v\n",
+    pnl.Breakevens, pnl.MaxProfit, pnl.MaxLoss)
+```
+
 ## Authentication
 
 Every request requires an API key passed via the `X-Api-Key` header. Get your
@@ -114,8 +154,12 @@ All methods take `context.Context` as the first argument and return
 | `ExposureLevels(ctx, symbol)` | Key support/resistance levels from options | Free+ |
 | `ExposureSummary(ctx, symbol)` | Full GEX/DEX/VEX/CHEX + hedging summary | Growth+ |
 | `Narrative(ctx, symbol)` | Verbal narrative analysis of exposure | Growth+ |
-| `ZeroDte(ctx, symbol, ...ZeroDteOption)` | 0DTE regime, expected move, pin risk | Growth+ |
+| `ZeroDte(ctx, symbol, ...ZeroDteOption)` | 0DTE regime, expected move, pin risk (`WithZeroDteExpiry` targets 1DTE/2DTE/any expiry) | Growth+ |
 | `MaxPain(ctx, symbol, ...MaxPainOption)` | Max pain analysis with dealer alignment, pain curve, pin probability | Growth+ |
+| `ExposureSheet(ctx, symbol, ...ExposureSheetOption)` | Full per-strike exposure sheet — net GEX/DEX/VEX/CHEX by strike (`WithSheetExpiration`, `WithSheetMinOI`) | Growth+ |
+| `ExposureTermStructure(ctx, symbol)` | Dealer exposure bucketed by DTE — gamma/vanna/charm term structure | Growth+ |
+| `ExposureBasket(ctx, symbols, ...BasketOption)` | Aggregate dealer exposure across a custom basket (`WithBasketWeights`) | Growth+ |
+| `ExposureOiDiff(ctx, symbol, ...OiDiffOption)` | Day-over-day open-interest change by strike, top movers (`WithOiDiffTopN`) | Growth+ |
 
 ### Flow (live, simulation-aware) — requires the Alpha plan
 
@@ -147,6 +191,62 @@ Each method has a strongly-typed `*Typed` variant (e.g. `FlowLevelsTyped`).
 | `FlowOptionsOutliers(ctx, ...FlowOption)` | Cross-symbol option-flow outliers |
 | `FlowStocksLeaderboard(ctx, ...FlowOption)` | Cross-symbol stock-flow leaderboard |
 | `FlowStocksOutliers(ctx, ...FlowOption)` | Cross-symbol stock-flow outliers |
+| `FlowDealerPremium(ctx, symbol, ...FlowOption)` | Net dealer option premium paid/received over a rolling window |
+| `FlowStockBars(ctx, symbol, resolution, ...BarsOption)` | OHLCV-style intraday stock-flow bars (1s/1m/5m/15m/30m/1h/4h) |
+
+### Zero-DTE Flow (intraday 0DTE, simulation-aware)
+
+Live same-day-expiry flow analytics. Each has a typed `*Typed` variant.
+
+| Method | Description | Plan |
+|---|---|---|
+| `FlowZeroDteSnapshot(ctx, symbol)` | 0DTE exposure snapshot + live flow direction | Growth+ |
+| `FlowZeroDteSeries(ctx, symbol, ...ZeroDteFlowOption)` | Intraday 0DTE GEX/DEX/vex/pin time series (`WithZeroDteFlowBar`, `WithZeroDteFlowMinutes`) | Growth+ |
+| `FlowZeroDteHedgeFlow(ctx, symbol, ...ZeroDteFlowOption)` | Estimated dealer hedging flow by side (`WithZeroDteFlowSide`) | Growth+ |
+| `FlowZeroDteHeatmap(ctx, symbol, ...ZeroDteFlowOption)` | Strike × time heatmap of gex/dex/vex/chex/oi/signed_flow (`WithZeroDteFlowMetric`, `WithZeroDteFlowMode`) | Alpha+ |
+| `FlowZeroDteStrikeFlow(ctx, symbol, ...ZeroDteFlowOption)` | Per-strike intraday 0DTE signed flow | Alpha+ |
+
+### Strategy Signals
+
+One decision-style endpoint per strategy. All return the shared typed
+`*StrategyDecisionResponse` envelope (verdict, conviction, rationale, suggested
+structure, risk). Tunable via `WithStrategyExpiry`, `WithStrategyMinOpenInterest`,
+`WithStrategyWingWidth`, `WithStrategyTargetShortDelta`, `WithStrategyMaxWidth`,
+`WithStrategyMinCredit`, `WithStrategyTargetDelta`, `WithStrategyStructure`,
+`WithStrategyExcludeEarningsBeforeExpiry`.
+
+| Method | Description | Plan |
+|---|---|---|
+| `StrategyFlowAnomaly(ctx, symbol, ...)` | Unusual options-flow anomaly read | Growth+ |
+| `StrategyExpiryPositioning(ctx, symbol, ...)` | Expiry-positioning / pinning structure | Basic+ |
+| `StrategyZeroDte(ctx, symbol, ...)` | 0DTE intraday strategy signal | Growth+ (+0DTE) |
+| `StrategyDealerRegime(ctx, symbol, ...)` | Dealer gamma/vanna regime call | Growth+ |
+| `StrategyVolCarry(ctx, symbol, ...)` | Vol-carry / short-premium harvest | Alpha+ |
+| `StrategyYieldEnhancement(ctx, symbol, ...)` | Covered-call / put-write yield structure | Growth+ |
+| `StrategySurfaceAnomaly(ctx, symbol, ...)` | Vol-surface mispricing / arbitrage | Alpha+ |
+| `StrategySkew(ctx, symbol, ...)` | Skew steepness / risk-reversal signal | Growth+ |
+| `StrategyTermStructure(ctx, symbol)` | Term-structure (contango/backwardation) signal | Growth+ |
+| `StrategyTailPricing(ctx, symbol, ...)` | Tail / convexity pricing signal | Growth+ |
+
+### Earnings Analytics
+
+| Method | Description | Plan |
+|---|---|---|
+| `EarningsCalendar(ctx, ...EarningsCalendarOption)` | Upcoming earnings calendar (`WithEarningsCalendarDays`, `...Symbols`, `...Importance`) | Growth+ |
+| `EarningsExpectedMove(ctx, symbol)` | Straddle-implied expected move into earnings | Growth+ |
+| `EarningsHistory(ctx, symbol, ...EarningsHistoryOption)` | Historical earnings moves vs implied (`WithEarningsHistoryLimit`) | Growth+ |
+| `EarningsIvCrush(ctx, symbol)` | Pre/post-earnings IV-crush analytics | Growth+ |
+| `EarningsVrp(ctx, symbol)` | Earnings variance risk premium | Alpha+ |
+| `EarningsDealerPositioning(ctx, symbol)` | Dealer positioning into the print | Alpha+ |
+| `EarningsStrategies(ctx, symbol)` | Suggested earnings option structures | Alpha+ |
+| `EarningsScreener(ctx, ...EarningsScreenerOption)` | Rank upcoming earnings by edge (`WithEarningsScreenerSort`, `...Limit`, `...Days`, `...MinImportance`) | Alpha+ |
+
+### Multi-Leg Structures (pure-math, POST)
+
+| Method | Description | Plan |
+|---|---|---|
+| `StructurePnl(ctx, StructurePnlRequest)` | Payoff/P&L curve for an arbitrary multi-leg structure | Basic+ |
+| `StructureGreeks(ctx, StructureGreeksRequest)` | Aggregate BSM greeks for a multi-leg structure | Basic+ |
 
 ### Market Data
 
@@ -156,6 +256,7 @@ Each method has a strongly-typed `*Typed` variant (e.g. `FlowLevelsTyped`).
 | `OptionQuote(ctx, ticker, ...OptionQuoteOption)` | Option quotes with greeks | Growth+ |
 | `StockSummary(ctx, symbol)` | Comprehensive stock summary | Free+ |
 | `Surface(ctx, symbol)` | Volatility surface grid | Public |
+| `SurfaceSvi(ctx, symbol)` | Calibrated SVI surface parameters (raw SVI a/b/rho/m/sigma per slice) | Alpha+ |
 
 ### Historical Data
 
@@ -178,12 +279,29 @@ Each method has a strongly-typed `*Typed` variant (e.g. `FlowLevelsTyped`).
 |---|---|---|
 | `Volatility(ctx, symbol)` | Comprehensive volatility analysis | Growth+ |
 | `AdvVolatility(ctx, symbol)` | SVI parameters, variance surface, arbitrage detection | Alpha+ |
-| `Vrp(ctx, symbol)` | Variance risk premium analytics — IV vs RV spread, gamma/vanna conditioning, strategy scores. Returns typed `*VrpResponse` with nested `Vrp.ZScore`, `Regime.NetGex`, `GexConditioned.HarvestScore`, `Directional.DownsideVrp`/`UpsideVrp`. | Alpha+ |
+| `Vrp(ctx, symbol, ...VrpOption)` | Variance risk premium analytics — IV vs RV spread, gamma/vanna conditioning, strategy scores. Returns typed `*VrpResponse` with nested `Vrp.ZScore`, `Regime.NetGex`, `GexConditioned.HarvestScore`, `Directional.DownsideVrp`/`UpsideVrp`. `WithVrpDate` requests a historical session. | Alpha+ |
+| `VrpHistory(ctx, symbol, ...VrpHistoryOption)` | Variance-risk-premium time series (`WithVrpHistoryDays`) | Alpha+ |
+| `ExpectedMove(ctx, symbol, ...ExpectedMoveOption)` | Straddle-implied expected move (`WithExpectedMoveExpiry`) | Basic+ |
+| `Liquidity(ctx, symbol)` | Options liquidity profile — spreads, depth, volume/OI quality | Growth+ |
+| `SkewTerm(ctx, symbol)` | Skew + term-structure grid (25-delta risk reversals across expiries) | Growth+ |
+| `SpotVolCorrelation(ctx, symbol)` | Spot-vol correlation / leverage effect estimate | Growth+ |
+| `Dispersion(ctx, index, symbols, ...DispersionOption)` | Index vs single-name dispersion / correlation trade analytics (`WithDispersionWeights`, `WithDispersionHorizonDays`) | Alpha+ |
+| `RealizedVolatility(ctx, symbol)` | Range-based realized vol estimators (close-to-close, Parkinson, Garman-Klass, Rogers-Satchell, Yang-Zhang) over 10/20/30-day windows | Alpha+ |
+| `VolatilityForecast(ctx, symbol, ...VolatilityForecastOption)` | Conditional vol forecasts — EWMA, HAR-RV, and GARCH(1,1) MLE term structure (`WithForecastDist`) | Alpha+ |
+
+### Macro and Universe
+
+| Method | Description | Plan |
+|---|---|---|
+| `VixState(ctx)` | VIX regime state — level, term structure, percentile, contango/backwardation | Growth+ |
+| `Universe(ctx, ...UniverseOption)` | Ranked tradable universe snapshot (`WithUniverseSort`, `WithUniverseLimit`) | Public |
 
 ### Reference Data
 
 | Method | Description | Plan |
 |---|---|---|
+| `Screener(ctx, ScreenerRequest)` | Live options screener — filter/rank by GEX, VRP, IV, greeks, harvest score, custom formulas | Growth+ |
+| `ScreenerFields(ctx)` | Discoverable list of screener fields + operators (build queries dynamically) | Free+ |
 | `Tickers(ctx)` | All available stock tickers | Free+ |
 | `Options(ctx, ticker)` | Option chain metadata (expirations + strikes) | Free+ |
 | `Symbols(ctx)` | Currently queried symbols with live data | Free+ |

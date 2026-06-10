@@ -548,6 +548,9 @@ func (c *Client) ZeroDteTyped(ctx context.Context, symbol string, opts ...ZeroDt
 	if cfg.strikeRange != nil {
 		params.Set("strike_range", strconv.FormatFloat(*cfg.strikeRange, 'f', -1, 64))
 	}
+	if cfg.expiry != "" {
+		params.Set("expiry", cfg.expiry)
+	}
 	raw, err := c.get(ctx, "/v1/exposure/zero-dte/"+symbol, params)
 	if err != nil {
 		return nil, err

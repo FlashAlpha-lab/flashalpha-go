@@ -234,11 +234,19 @@ type ZeroDteOption func(*zeroDteConfig)
 
 type zeroDteConfig struct {
 	strikeRange *float64
+	expiry      string
 }
 
 // WithStrikeRange sets the strike range around the spot price for 0DTE analytics.
 func WithStrikeRange(r float64) ZeroDteOption {
 	return func(c *zeroDteConfig) { c.strikeRange = &r }
+}
+
+// WithZeroDteExpiry targets a specific expiry (YYYY-MM-DD) for the 0DTE
+// analytics — selects 1DTE / 2DTE / any expiry via the same 0DTE selector.
+// Omit for today's same-day expiry.
+func WithZeroDteExpiry(expiry string) ZeroDteOption {
+	return func(c *zeroDteConfig) { c.expiry = expiry }
 }
 
 // OptionQuoteOption configures an OptionQuote request.
@@ -301,7 +309,7 @@ type GreeksParams struct {
 	Strike float64
 	DTE    float64
 	Sigma  float64
-	Type   string  // "call" or "put"; defaults to "call"
+	Type   string // "call" or "put"; defaults to "call"
 	R      *float64
 	Q      *float64
 }
@@ -312,7 +320,7 @@ type IVParams struct {
 	Strike float64
 	DTE    float64
 	Price  float64
-	Type   string  // "call" or "put"; defaults to "call"
+	Type   string // "call" or "put"; defaults to "call"
 	R      *float64
 	Q      *float64
 }
@@ -325,7 +333,7 @@ type KellyParams struct {
 	Sigma   float64
 	Premium float64
 	Mu      float64
-	Type    string  // "call" or "put"; defaults to "call"
+	Type    string // "call" or "put"; defaults to "call"
 	R       *float64
 	Q       *float64
 }
@@ -418,6 +426,9 @@ func (c *Client) ZeroDte(ctx context.Context, symbol string, opts ...ZeroDteOpti
 	params := url.Values{}
 	if cfg.strikeRange != nil {
 		params.Set("strike_range", strconv.FormatFloat(*cfg.strikeRange, 'f', -1, 64))
+	}
+	if cfg.expiry != "" {
+		params.Set("expiry", cfg.expiry)
 	}
 	return c.get(ctx, "/v1/exposure/zero-dte/"+seg(symbol), params)
 }
@@ -706,6 +717,38 @@ func (c *Client) ScreenerRaw(ctx context.Context, body interface{}) (map[string]
 	return c.post(ctx, "/v1/screener", body)
 }
 
+// ScreenerField is one queryable screener field with its value type.
+type ScreenerField struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+// ScreenerFieldsResponse is the typed body of GET /v1/screener/fields.
+type ScreenerFieldsResponse struct {
+	Fields []ScreenerField `json:"fields"`
+	Count  int             `json:"count"`
+}
+
+// ScreenerFields lists every field that can be referenced in a screener query's
+// filters / sort / select / formula expressions, with its value type.
+// Requires any authenticated API key (Free+).
+func (c *Client) ScreenerFields(ctx context.Context) (map[string]interface{}, error) {
+	return c.get(ctx, "/v1/screener/fields", nil)
+}
+
+// ScreenerFieldsTyped is the strongly-typed variant of ScreenerFields.
+func (c *Client) ScreenerFieldsTyped(ctx context.Context) (*ScreenerFieldsResponse, error) {
+	raw, err := c.ScreenerFields(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := &ScreenerFieldsResponse{}
+	if err := decodeTyped("screener fields", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Health checks whether the API is operational. This endpoint is public and does
 // not require authentication.
 func (c *Client) Health(ctx context.Context) (map[string]interface{}, error) {
@@ -836,9 +879,22 @@ type VrpResponse struct {
 	Raw              map[string]interface{} `json:"-"`
 }
 
+// VrpOption configures a Vrp request.
+type VrpOption func(*vrpConfig)
+
+type vrpConfig struct {
+	date string
+}
+
+// WithVrpDate requests the VRP snapshot for a specific historical session
+// (YYYY-MM-DD) instead of the live/most-recent snapshot. Omit for live.
+func WithVrpDate(date string) VrpOption {
+	return func(c *vrpConfig) { c.date = date }
+}
+
 // Vrp returns variance-risk-premium analytics — the implied-vs-realized vol
 // spread, conditioned on dealer gamma and vanna regime, plus strategy scores
-// for harvesting. Requires Alpha+ plan.
+// for harvesting. Requires Alpha+ plan. Optional: WithVrpDate.
 //
 // The response is nested. Common access paths:
 //
@@ -848,8 +904,16 @@ type VrpResponse struct {
 //   - resp.Directional.DownsideVrp / .UpsideVrp  (NOT put_vrp/call_vrp)
 //
 // Top-level composite scores: resp.NetHarvestScore, resp.DealerFlowRisk.
-func (c *Client) Vrp(ctx context.Context, symbol string) (*VrpResponse, error) {
-	raw, err := c.get(ctx, "/v1/vrp/"+seg(symbol), nil)
+func (c *Client) Vrp(ctx context.Context, symbol string, opts ...VrpOption) (*VrpResponse, error) {
+	cfg := &vrpConfig{}
+	for _, o := range opts {
+		o(cfg)
+	}
+	params := url.Values{}
+	if cfg.date != "" {
+		params.Set("date", cfg.date)
+	}
+	raw, err := c.get(ctx, "/v1/vrp/"+seg(symbol), params)
 	if err != nil {
 		return nil, err
 	}
