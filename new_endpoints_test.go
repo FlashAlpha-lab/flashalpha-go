@@ -430,12 +430,16 @@ func TestFlowZeroDteSnapshot(t *testing.T) {
 		"symbol":         "SPY",
 		"flow_direction": map[string]interface{}{"label": "amplifying"},
 	})
-	resp, err := client.FlowZeroDteSnapshotTyped(context.Background(), "SPY")
+	resp, err := client.FlowZeroDteSnapshotTyped(context.Background(), "SPY",
+		flashalpha.WithZeroDteFlowExpiry("2026-06-08"))
 	if err != nil {
 		t.Fatalf("FlowZeroDteSnapshotTyped: %v", err)
 	}
 	if cap.Path != "/v1/flow/zero-dte/snapshot/SPY" {
 		t.Errorf("path = %q", cap.Path)
+	}
+	if !strings.Contains(cap.Query, "expiry=2026-06-08") {
+		t.Errorf("query = %q", cap.Query)
 	}
 	if resp.FlowDirection == nil || resp.FlowDirection.Label != "amplifying" {
 		t.Errorf("FlowDirection = %+v", resp.FlowDirection)
@@ -528,6 +532,35 @@ func TestFlowZeroDteStrikeFlow(t *testing.T) {
 	}
 	if len(resp.Bars[0].Contracts) != 2 {
 		t.Errorf("resp = %+v", resp)
+	}
+}
+
+func TestFlowZeroDteLeaderboard(t *testing.T) {
+	_, client, cap := newCapturingServer(t, 200, map[string]interface{}{
+		"metric":      "heat",
+		"n":           float64(2),
+		"market_open": true,
+		"entries": []interface{}{
+			map[string]interface{}{"rank": float64(1), "symbol": "SPY", "value": float64(98.5)},
+			map[string]interface{}{"rank": float64(2), "symbol": "QQQ", "value": float64(91.2)},
+		},
+	})
+	resp, err := client.FlowZeroDteLeaderboardTyped(context.Background(),
+		flashalpha.WithZeroDteFlowMetric("heat"), flashalpha.WithZeroDteFlowN(2))
+	if err != nil {
+		t.Fatalf("FlowZeroDteLeaderboardTyped: %v", err)
+	}
+	if cap.Path != "/v1/flow/zero-dte/leaderboard" {
+		t.Errorf("path = %q", cap.Path)
+	}
+	if !strings.Contains(cap.Query, "metric=heat") || !strings.Contains(cap.Query, "n=2") {
+		t.Errorf("query = %q", cap.Query)
+	}
+	if resp.Metric != "heat" || resp.N != 2 || !resp.MarketOpen {
+		t.Errorf("resp = %+v", resp)
+	}
+	if len(resp.Entries) != 2 || resp.Entries[0].Symbol != "SPY" || resp.Entries[1].Rank != 2 {
+		t.Errorf("entries = %+v", resp.Entries)
 	}
 }
 

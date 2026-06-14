@@ -144,6 +144,8 @@ type zeroDteFlowConfig struct {
 	side    string
 	metric  string
 	mode    string
+	n       *int
+	expiry  string
 }
 
 // WithZeroDteFlowBar sets the bar size. /series and /hedge-flow accept
@@ -173,6 +175,16 @@ func WithZeroDteFlowMode(mode string) ZeroDteFlowOption {
 	return func(c *zeroDteFlowConfig) { c.mode = mode }
 }
 
+// WithZeroDteFlowN sets the number of ranked rows (1–100) for the leaderboard.
+func WithZeroDteFlowN(n int) ZeroDteFlowOption {
+	return func(c *zeroDteFlowConfig) { c.n = &n }
+}
+
+// WithZeroDteFlowExpiry pins the snapshot to a specific expiry (YYYY-MM-DD).
+func WithZeroDteFlowExpiry(expiry string) ZeroDteFlowOption {
+	return func(c *zeroDteFlowConfig) { c.expiry = expiry }
+}
+
 func zeroDteFlowConfigFrom(opts []ZeroDteFlowOption) *zeroDteFlowConfig {
 	cfg := &zeroDteFlowConfig{}
 	for _, o := range opts {
@@ -184,15 +196,22 @@ func zeroDteFlowConfigFrom(opts []ZeroDteFlowOption) *zeroDteFlowConfig {
 // FlowZeroDteSnapshot returns the current live 0DTE shape — the same fields as
 // ZeroDte plus a flow_direction block (settled vs live net GEX, flow GEX
 // adjustment, amplifying/dampening label). Requires Growth+. Untyped because it
-// returns the full 0DTE payload; access flow_direction via the map.
-func (c *Client) FlowZeroDteSnapshot(ctx context.Context, symbol string) (map[string]interface{}, error) {
-	return c.get(ctx, "/v1/flow/zero-dte/snapshot/"+seg(symbol), nil)
+// returns the full 0DTE payload; access flow_direction via the map. Optional:
+// WithZeroDteFlowExpiry.
+func (c *Client) FlowZeroDteSnapshot(ctx context.Context, symbol string, opts ...ZeroDteFlowOption) (map[string]interface{}, error) {
+	cfg := zeroDteFlowConfigFrom(opts)
+	params := url.Values{}
+	if cfg.expiry != "" {
+		params.Set("expiry", cfg.expiry)
+	}
+	return c.get(ctx, "/v1/flow/zero-dte/snapshot/"+seg(symbol), params)
 }
 
 // FlowZeroDteSnapshotTyped decodes the snapshot into a *FlowZeroDteSnapshotResponse.
 // The full 0DTE payload is preserved in Raw; FlowDirection is surfaced typed.
-func (c *Client) FlowZeroDteSnapshotTyped(ctx context.Context, symbol string) (*FlowZeroDteSnapshotResponse, error) {
-	raw, err := c.FlowZeroDteSnapshot(ctx, symbol)
+// Optional: WithZeroDteFlowExpiry.
+func (c *Client) FlowZeroDteSnapshotTyped(ctx context.Context, symbol string, opts ...ZeroDteFlowOption) (*FlowZeroDteSnapshotResponse, error) {
+	raw, err := c.FlowZeroDteSnapshot(ctx, symbol, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -443,6 +462,51 @@ func (c *Client) FlowZeroDteStrikeFlowTyped(ctx context.Context, symbol string, 
 	}
 	out := &ZeroDteStrikeFlowResponse{}
 	if err := decodeTyped("flow zero-dte strike-flow", raw, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ZeroDteLeaderboardEntry is one ranked symbol on the 0DTE-flow leaderboard.
+type ZeroDteLeaderboardEntry struct {
+	Rank   int     `json:"rank"`
+	Symbol string  `json:"symbol"`
+	Value  float64 `json:"value"`
+}
+
+// ZeroDteLeaderboardResponse is the body of GET /v1/flow/zero-dte/leaderboard.
+type ZeroDteLeaderboardResponse struct {
+	Metric     string                    `json:"metric"`
+	N          int                       `json:"n"`
+	AsOf       string                    `json:"as_of"`
+	MarketOpen bool                      `json:"market_open"`
+	Entries    []ZeroDteLeaderboardEntry `json:"entries"`
+}
+
+// FlowZeroDteLeaderboard returns the cross-symbol 0DTE-flow leaderboard — the
+// top-N symbols ranked by a chosen intraday metric. Cross-symbol, so it takes no
+// symbol path segment. Requires Alpha+. Optional: WithZeroDteFlowMetric
+// (heat/pin_risk/abs_flow/charm_intensity), WithZeroDteFlowN (1–100).
+func (c *Client) FlowZeroDteLeaderboard(ctx context.Context, opts ...ZeroDteFlowOption) (map[string]interface{}, error) {
+	cfg := zeroDteFlowConfigFrom(opts)
+	params := url.Values{}
+	if cfg.metric != "" {
+		params.Set("metric", cfg.metric)
+	}
+	if cfg.n != nil {
+		params.Set("n", strconv.Itoa(*cfg.n))
+	}
+	return c.get(ctx, "/v1/flow/zero-dte/leaderboard", params)
+}
+
+// FlowZeroDteLeaderboardTyped is the strongly-typed variant of FlowZeroDteLeaderboard.
+func (c *Client) FlowZeroDteLeaderboardTyped(ctx context.Context, opts ...ZeroDteFlowOption) (*ZeroDteLeaderboardResponse, error) {
+	raw, err := c.FlowZeroDteLeaderboard(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out := &ZeroDteLeaderboardResponse{}
+	if err := decodeTyped("flow zero-dte leaderboard", raw, out); err != nil {
 		return nil, err
 	}
 	return out, nil

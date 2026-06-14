@@ -407,6 +407,23 @@ func TestIntegrationFlowStocksOutliers(t *testing.T) {
 	}
 }
 
+func TestIntegrationFlowZeroDteLeaderboard(t *testing.T) {
+	client := newIntegrationClient(t)
+	ctx, cancel := integrationCtx()
+	defer cancel()
+	r, err := client.FlowZeroDteLeaderboard(ctx,
+		flashalpha.WithZeroDteFlowMetric("heat"), flashalpha.WithZeroDteFlowN(5))
+	if err != nil {
+		t.Fatalf("FlowZeroDteLeaderboard: %v", err)
+	}
+	requireKeys(t, r, []string{"metric", "n", "as_of", "market_open", "entries"},
+		"flow/zero-dte/leaderboard")
+	if el, ok := firstElem(r, "entries"); ok {
+		requireKeys(t, el, []string{"rank", "symbol", "value"},
+			"flow/zero-dte/leaderboard.entries[0]")
+	}
+}
+
 var signalFields = []string{"ts", "expiry", "strike", "right", "side", "price",
 	"size", "premium", "dte", "structure", "aggressor", "open_close_bias",
 	"open_close_confidence", "contract_net_oi_delta", "intent", "score",
