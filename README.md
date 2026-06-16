@@ -313,6 +313,21 @@ structure, risk). Tunable via `WithStrategyExpiry`, `WithStrategyMinOpenInterest
 | `Account(ctx)` | Account info and quota usage | Free+ |
 | `Health(ctx)` | API health check | Public |
 
+## Futures (CME equity-index)
+
+FlashAlpha serves the full options-analytics stack for **CME equity-index futures** — **`ES=F`** (E-mini S&P 500) and **`NQ=F`** (E-mini Nasdaq-100). Options-on-futures are priced with **Black-76** (forward-priced) using the correct CME contract multipliers. Everything that works for an equity works for futures: gamma exposure (GEX), DEX, VEX, CHEX, key levels, max pain, the IV surface, exposure summary, narrative, and live flow.
+
+```go
+// Gamma exposure for the E-mini S&P 500 future
+gex, err := client.Gex(ctx, "ES=F")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(gex)
+```
+
+Use the `=F` suffix — bare `ES`/`NQ` are equities, not futures. In raw REST paths URL-encode the `=` as `%3D` (e.g. `GET /v1/exposure/gex/ES%3DF`); SDK methods take the plain string `"ES=F"`. Historical replay for futures is coming; live analytics are available now.
+
 ## Functional Options
 
 Optional parameters use the functional options pattern:
