@@ -148,20 +148,20 @@ All methods take `context.Context` as the first argument and return
 | Method | Description | Plan |
 |---|---|---|
 | `Gex(ctx, symbol, ...GexOption)` | Gamma exposure by strike | Free+ |
-| `Dex(ctx, symbol, ...DexOption)` | Delta exposure by strike | Free+ |
-| `Vex(ctx, symbol, ...VexOption)` | Vanna exposure by strike | Free+ |
-| `Chex(ctx, symbol, ...ChexOption)` | Charm exposure by strike | Free+ |
+| `Dex(ctx, symbol, ...DexOption)` | Delta exposure by strike | Basic+ |
+| `Vex(ctx, symbol, ...VexOption)` | Vanna exposure by strike | Basic+ |
+| `Chex(ctx, symbol, ...ChexOption)` | Charm exposure by strike | Basic+ |
 | `ExposureLevels(ctx, symbol)` | Key support/resistance levels from options | Free+ |
 | `ExposureSummary(ctx, symbol)` | Full GEX/DEX/VEX/CHEX + hedging summary | Growth+ |
 | `Narrative(ctx, symbol)` | Verbal narrative analysis of exposure | Growth+ |
 | `ZeroDte(ctx, symbol, ...ZeroDteOption)` | 0DTE regime, expected move, pin risk (`WithZeroDteExpiry` targets 1DTE/2DTE/any expiry) | Growth+ |
-| `MaxPain(ctx, symbol, ...MaxPainOption)` | Max pain analysis with dealer alignment, pain curve, pin probability | Growth+ |
+| `MaxPain(ctx, symbol, ...MaxPainOption)` | Max pain analysis with dealer alignment, pain curve, pin probability | Basic+ |
 | `ExposureSheet(ctx, symbol, ...ExposureSheetOption)` | Full per-strike exposure sheet — net GEX/DEX/VEX/CHEX by strike (`WithSheetExpiration`, `WithSheetMinOI`) | Growth+ |
 | `ExposureTermStructure(ctx, symbol)` | Dealer exposure bucketed by DTE — gamma/vanna/charm term structure | Growth+ |
 | `ExposureBasket(ctx, symbols, ...BasketOption)` | Aggregate dealer exposure across a custom basket (`WithBasketWeights`) | Growth+ |
 | `ExposureOiDiff(ctx, symbol, ...OiDiffOption)` | Day-over-day open-interest change by strike, top movers (`WithOiDiffTopN`) | Growth+ |
 
-### Flow (live, simulation-aware) — requires the Alpha plan
+### Flow (live, simulation-aware) — Growth+ (raw tape, unusual-flow signals, OI simulator state & the full live bundle are Alpha)
 
 Each method has a strongly-typed `*Typed` variant (e.g. `FlowLevelsTyped`).
 
@@ -460,16 +460,18 @@ MIT. See [LICENSE](LICENSE).
 - [Volatility Surface Python](https://github.com/FlashAlpha-lab/volatility-surface-python) — SVI calibration, variance swap, skew analysis
 - [Awesome Options Analytics](https://github.com/FlashAlpha-lab/awesome-options-analytics) — curated resource list
 
-## What the Alpha tier unlocks
+## What the paid tiers unlock
 
-Free and entry tiers cover live exposure analytics. The **Alpha tier ($1,499/mo)**
-adds the data you cannot get anywhere else:
+The free tier covers single-expiry GEX on equities, key levels, the BSM Greeks/IV
+calculator and stock quotes. Paid tiers add:
 
-- **Aggregate vanna and charm exposure.** FlashAlpha is the only public source for
-  these dealer-positioning aggregates.
-- **Point-in-time replay since 2018.** Backtest and trade the same code, with no
-  look-ahead and no training-serving skew.
-- **SVI vol surfaces, VRP analytics, higher-order Greeks**, uncached and unlimited.
+- **DEX, VEX (vanna) and CHEX (charm) exposure, plus max pain** — from the **Basic tier**
+  ($79/mo), with ETF and index symbols.
+- **Full-chain GEX, 0DTE and flow analytics** — from the **Growth tier** ($299/mo).
+- **Point-in-time replay since 2018, SVI vol surfaces, VRP analytics, higher-order Greeks**,
+  uncached and unlimited — the **Alpha tier** ($1,499/mo). FlashAlpha is one of the only
+  public APIs publishing aggregate vanna and charm exposure across the full universe, with
+  no look-ahead and no training-serving skew.
 
 Built for quants, prop desks, and vol funds. See the full picture and get a key:
 **[flashalpha.com/for-quant-teams](https://flashalpha.com/for-quant-teams?utm_source=github&utm_medium=readme&utm_campaign=repo-flashalpha-go)**
