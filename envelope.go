@@ -27,7 +27,8 @@ type DataAsOf struct {
 	EquityFeed *string `json:"equity_feed"`
 	// EquityOptionsFeed covers equity and ETF option quotes. Ticks in seconds during market hours.
 	EquityOptionsFeed *string `json:"equity_options_feed"`
-	// IndexFeed covers index spot - SPX, NDX, RUT, VIX. Ticks in seconds during market hours.
+	// IndexFeed covers index spot - SPX, RUT, VIX and the other index roots. Ticks in
+	// seconds during market hours.
 	IndexFeed *string `json:"index_feed"`
 	// IndexOptionsFeed covers index option quotes. Ticks in seconds during market hours.
 	IndexOptionsFeed *string `json:"index_options_feed"`
