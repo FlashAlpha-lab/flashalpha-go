@@ -40,6 +40,8 @@ type EarningsEvent struct {
 
 // EarningsCalendarResponse is the body of GET /v1/earnings/calendar.
 type EarningsCalendarResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Events []EarningsEvent `json:"events"`
 	Count  int             `json:"count"`
 }
@@ -116,6 +118,8 @@ type EarningsExpectedMoveBlock struct {
 
 // EarningsExpectedMoveResponse is the body of GET /v1/earnings/expected-move/{symbol}.
 type EarningsExpectedMoveResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol          string                     `json:"symbol"`
 	UnderlyingPrice *float64                   `json:"underlying_price"`
 	AsOf            string                     `json:"as_of"`
@@ -165,6 +169,8 @@ type EarningsHistoryEvent struct {
 
 // EarningsHistoryResponse is the body of GET /v1/earnings/history/{symbol}.
 type EarningsHistoryResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol  string                 `json:"symbol"`
 	Count   int                    `json:"count"`
 	History []EarningsHistoryEvent `json:"history"`
@@ -230,6 +236,8 @@ type EarningsIvCrushDistribution struct {
 
 // EarningsIvCrushResponse is the body of GET /v1/earnings/iv-crush/{symbol}.
 type EarningsIvCrushResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol          string                       `json:"symbol"`
 	AsOf            string                       `json:"as_of"`
 	EarningsDate    *string                      `json:"earnings_date"`
@@ -279,6 +287,8 @@ type EarningsSurpriseReaction struct {
 
 // EarningsVrpResponse is the body of GET /v1/earnings/vrp/{symbol}.
 type EarningsVrpResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol           string                    `json:"symbol"`
 	UnderlyingPrice  *float64                  `json:"underlying_price"`
 	AsOf             string                    `json:"as_of"`
@@ -336,6 +346,8 @@ type EarningsTopStrike struct {
 // EarningsDealerPositioningResponse is the body of
 // GET /v1/earnings/dealer-positioning/{symbol}.
 type EarningsDealerPositioningResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol            string                `json:"symbol"`
 	UnderlyingPrice   *float64              `json:"underlying_price"`
 	AsOf              string                `json:"as_of"`
@@ -389,6 +401,8 @@ type EarningsStrategyContext struct {
 
 // EarningsStrategiesResponse is the body of GET /v1/earnings/strategies/{symbol}.
 type EarningsStrategiesResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol       string                   `json:"symbol"`
 	AsOf         string                   `json:"as_of"`
 	EarningsDate string                   `json:"earnings_date"`
@@ -433,6 +447,8 @@ type EarningsScreenerEvent struct {
 
 // EarningsScreenerResponse is the body of GET /v1/earnings/screener.
 type EarningsScreenerResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Events []EarningsScreenerEvent `json:"events"`
 	Count  int                     `json:"count"`
 }

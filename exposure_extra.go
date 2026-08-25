@@ -100,6 +100,8 @@ type ExposureSheetStrike struct {
 
 // ExposureSheetResponse is the typed body of GET /v1/exposure/sheet/{symbol}.
 type ExposureSheetResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol           string                `json:"symbol"`
 	UnderlyingPrice  *float64              `json:"underlying_price"`
 	AsOf             string                `json:"as_of"`
@@ -173,6 +175,8 @@ type ExposureExpiryRow struct {
 
 // ExposureTermStructureResponse is the body of GET /v1/exposure/term-structure/{symbol}.
 type ExposureTermStructureResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol          string              `json:"symbol"`
 	UnderlyingPrice *float64            `json:"underlying_price"`
 	AsOf            string              `json:"as_of"`
@@ -227,6 +231,8 @@ type ExposureBasketConstituent struct {
 
 // ExposureBasketResponse is the body of GET /v1/exposure/basket.
 type ExposureBasketResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	AsOf             string                      `json:"as_of"`
 	ConstituentCount int                         `json:"constituent_count"`
 	MissingSymbols   []string                    `json:"missing_symbols"`
@@ -290,6 +296,8 @@ type OiChange struct {
 
 // ExposureOiDiffResponse is the body of GET /v1/exposure/oi-diff/{symbol}.
 type ExposureOiDiffResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol                 string     `json:"symbol"`
 	UnderlyingPrice        *float64   `json:"underlying_price"`
 	AsOf                   string     `json:"as_of"`

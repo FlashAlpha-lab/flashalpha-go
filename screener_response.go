@@ -42,6 +42,8 @@ type ScreenerResponseMeta struct {
 // `formulas`). For typed access, inspect the column names you supplied in
 // ScreenerRequest.Select.
 type ScreenerResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Meta is the pagination + universe + tier + as-of metadata.
 	Meta *ScreenerResponseMeta `json:"meta"`
 	// Data is the result rows. Columns depend on the request's `select` and

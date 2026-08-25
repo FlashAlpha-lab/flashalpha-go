@@ -65,6 +65,8 @@ type PnlPoint struct {
 // StructurePnlResponse is the body of POST /v1/structures/pnl. MaxProfit /
 // MaxLoss are nil when unbounded on that side.
 type StructurePnlResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Legs       []StructurePnlLeg `json:"legs"`
 	PnlCurve   []PnlPoint        `json:"pnl_curve"`
 	Breakevens []float64         `json:"breakevens"`
@@ -85,6 +87,8 @@ type PositionGreeks struct {
 
 // StructureGreeksResponse is the body of POST /v1/structures/greeks.
 type StructureGreeksResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Spot           float64              `json:"spot"`
 	AsOf           string               `json:"as_of"`
 	ValuationDate  string               `json:"valuation_date"`

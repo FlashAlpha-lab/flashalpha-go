@@ -3,6 +3,36 @@
 All notable changes to `flashalpha-go` are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-08-25
+
+### Added
+- **`data_as_of` response envelope.** Every successful response now carries
+  `data_as_of`, reporting when each upstream feed last delivered to the node that
+  answered: equity and index spot, their option chains, futures and futures
+  options, the classified trade tape, settled open interest, and the macro series,
+  each reported separately because they arrive over different pipes and fail
+  independently. `endpoint_version` identifies the deployment that produced the
+  response.
+- **`DataAsOf`** type and a `ResponseEnvelope` struct embedded in all 83 response
+  types. Because the embed is anonymous, `encoding/json` flattens it: the wire
+  shape is unchanged and both fields are promoted, so they read as
+  `gex.DataAsOf` and `gex.EndpointVersion`. Previously `json.Unmarshal` bound only
+  declared fields, so the envelope arrived and was discarded.
+- Feed fields are `*string`, so a feed the node has not seen is `nil` rather than
+  an empty string. Absent envelopes leave `DataAsOf` nil, so existing code is
+  unaffected.
+
+### Notes
+- Read each feed against its own cadence rather than against `as_of`. Settled open
+  interest dated to the previous session's close is correct, since it is published
+  once per session; an options feed an hour behind during the regular session is
+  not.
+- A `nil` means that node has not seen that feed, not that it is broken.
+- The field evidences that a feed delivered recently. It does not assert that every
+  contract in a chain is equally current.
+- Endpoints returning a bare JSON array carry the same information in the
+  `X-Data-As-Of` and `X-Endpoint-Version` response headers.
+
 ## [1.1.0] - 2026-06-08
 
 Full parity with the expanded FlashAlpha analytics API. ~33 new endpoints added,

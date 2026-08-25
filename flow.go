@@ -116,6 +116,8 @@ func flowParams(opts []FlowOption) (*flowConfig, url.Values) {
 // gamma flip / call & put walls / max pain recomputed against the live
 // (intraday-flow-adjusted) book. Each level is nil when it can't be located.
 type FlowLevelsResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// AsOf is the timestamp this snapshot was computed for (ISO-8601 UTC).
@@ -155,6 +157,8 @@ type FlowPinRiskBreakdown struct {
 // FlowPinRiskResponse is the typed body of GET /v1/flow/pin-risk/{symbol}:
 // a 0–100 composite pin-risk score plus the magnet strike and breakdown.
 type FlowPinRiskResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// AsOf is the timestamp this snapshot was computed for (ISO-8601 UTC).
@@ -182,6 +186,8 @@ type FlowPinRiskResponse struct {
 // FlowSummaryResponse is the typed body of GET /v1/flow/summary/{symbol}:
 // an at-a-glance read on whether today's tape has shifted the dealer book.
 type FlowSummaryResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// AsOf is the timestamp this snapshot was computed for (ISO-8601 UTC).
@@ -212,6 +218,8 @@ type FlowSummaryResponse struct {
 // (official) OI vs the intraday simulated OI. This endpoint does NOT return
 // underlying_price.
 type FlowOiResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// AsOf is the timestamp this snapshot was computed for (ISO-8601 UTC).
@@ -240,6 +248,8 @@ type FlowOiResponse struct {
 // FlowGexResponse is the typed body of GET /v1/flow/gex/{symbol}: the live
 // (flow-adjusted) GEX with the same per-strike shape as /v1/exposure/gex.
 type FlowGexResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// AsOf is the timestamp this snapshot was computed for (ISO-8601 UTC).
@@ -262,6 +272,8 @@ type FlowGexResponse struct {
 // FlowDexResponse is the typed body of GET /v1/flow/dex/{symbol}: the live
 // (flow-adjusted) DEX with the same per-strike shape as /v1/exposure/dex.
 type FlowDexResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// AsOf is the timestamp this snapshot was computed for (ISO-8601 UTC).
@@ -280,6 +292,8 @@ type FlowDexResponse struct {
 // GET /v1/flow/dealer-risk/{symbol}: a side-by-side of the settled snapshot
 // and the live flow-adjusted book, with the adjustment today's tape produced.
 type FlowDealerRiskResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// AsOf is the timestamp this snapshot was computed for (ISO-8601 UTC).
@@ -350,6 +364,8 @@ type FlowAdjustedDealerRisk struct {
 // everything-at-once convenience bundle (OI simulator state + live exposure
 // + live levels + pin risk + nested dealer-risk block).
 type FlowLiveResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// AsOf is the timestamp this snapshot was computed for (ISO-8601 UTC).
@@ -424,6 +440,8 @@ type FlowOptionTrade struct {
 // GET /v1/flow/options/{symbol}/recent: a newest-first option trade tape.
 // Expiry is echoed only when the filter is supplied.
 type FlowOptionRecentResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// Expiry is the expiration filter echoed back when supplied, else nil.
@@ -439,6 +457,8 @@ type FlowOptionRecentResponse struct {
 // FlowOptionSummaryResponse is the typed body of
 // GET /v1/flow/options/{symbol}/summary: per-underlying option-flow aggregates.
 type FlowOptionSummaryResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// Expiry is the expiration filter echoed back when supplied, else nil.
@@ -483,6 +503,8 @@ type FlowOptionBlock struct {
 // FlowOptionBlocksResponse is the typed body of
 // GET /v1/flow/options/{symbol}/blocks: all trades with size >= minSize.
 type FlowOptionBlocksResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// Expiry is the expiration filter echoed back when supplied, else nil.
@@ -523,6 +545,8 @@ type FlowHistoryBucket struct {
 // FlowOptionHistoryResponse is the typed body of
 // GET /v1/flow/options/{symbol}/history: newest-first per-minute buckets.
 type FlowOptionHistoryResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// Expiry is the expiration filter echoed back when supplied, else nil.
@@ -554,6 +578,8 @@ type FlowCumulativePoint struct {
 // FlowOptionCumulativeResponse is the typed body of
 // GET /v1/flow/options/{symbol}/cumulative.
 type FlowOptionCumulativeResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// Expiry is the expiration filter echoed back when supplied, else nil.
@@ -587,6 +613,8 @@ type FlowStockTrade struct {
 // FlowStockRecentResponse is the typed body of
 // GET /v1/flow/stocks/{symbol}/recent: a newest-first stock trade tape.
 type FlowStockRecentResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// Count is the number of trades returned (capped by the limit).
@@ -600,6 +628,8 @@ type FlowStockRecentResponse struct {
 // FlowStockSummaryResponse is the typed body of
 // GET /v1/flow/stocks/{symbol}/summary: per-symbol stock-flow aggregates.
 type FlowStockSummaryResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// TotalTrades is the total number of trade prints.
@@ -638,6 +668,8 @@ type FlowStockBlock struct {
 // FlowStockBlocksResponse is the typed body of
 // GET /v1/flow/stocks/{symbol}/blocks: all trades with size >= minSize.
 type FlowStockBlocksResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// MinSize is the minimum trade size that qualified as a block (echoed).
@@ -680,6 +712,8 @@ type FlowStockHistoryBucket struct {
 // FlowStockHistoryResponse is the typed body of
 // GET /v1/flow/stocks/{symbol}/history: newest-first per-minute buckets.
 type FlowStockHistoryResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// Minutes is the lookback window in minutes (echoed back).
@@ -693,6 +727,8 @@ type FlowStockHistoryResponse struct {
 // FlowStockCumulativeResponse is the typed body of
 // GET /v1/flow/stocks/{symbol}/cumulative.
 type FlowStockCumulativeResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// Minutes is the lookback window in minutes (echoed back).
@@ -729,6 +765,8 @@ type FlowOptionLeaderRow struct {
 // FlowOptionLeaderboardResponse is the typed body of
 // GET /v1/flow/options/leaderboard: top-N net-dollar buyers and sellers.
 type FlowOptionLeaderboardResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// GeneratedUtc is when the cached snapshot was generated (ISO-8601 UTC).
 	GeneratedUtc string `json:"generatedUtc"`
 	// N is the number of ranked rows requested per side.
@@ -782,6 +820,8 @@ type FlowOutlierRow struct {
 // FlowOptionOutliersResponse is the typed body of
 // GET /v1/flow/options/outliers.
 type FlowOptionOutliersResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// GeneratedUtc is when the cached snapshot was generated (ISO-8601 UTC).
 	GeneratedUtc string `json:"generatedUtc"`
 	// WindowMinutes is the aggregation window in minutes.
@@ -820,6 +860,8 @@ type FlowStockLeaderRow struct {
 // FlowStockLeaderboardResponse is the typed body of
 // GET /v1/flow/stocks/leaderboard: top-N net-dollar buyers and sellers.
 type FlowStockLeaderboardResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// GeneratedUtc is when the cached snapshot was generated (ISO-8601 UTC).
 	GeneratedUtc string `json:"generatedUtc"`
 	// N is the number of ranked rows requested per side.
@@ -835,6 +877,8 @@ type FlowStockLeaderboardResponse struct {
 // FlowStockOutliersResponse is the typed body of
 // GET /v1/flow/stocks/outliers.
 type FlowStockOutliersResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// GeneratedUtc is when the cached snapshot was generated (ISO-8601 UTC).
 	GeneratedUtc string `json:"generatedUtc"`
 	// WindowMinutes is the aggregation window in minutes.
@@ -984,6 +1028,8 @@ type FlowSignal struct {
 // look-back window is coalesced into a signal, scored 0–100, and ranked
 // highest score first. Requires the Alpha plan.
 type FlowSignalsResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// AsOf is the timestamp this snapshot was computed for (ISO-8601 UTC).
@@ -1009,6 +1055,8 @@ type FlowSignalsResponse struct {
 // opening/closing buckets — a cheap "smart-money tilt" read for one
 // underlying. Requires the Alpha plan.
 type FlowSignalsSummaryResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// AsOf is the timestamp this snapshot was computed for (ISO-8601 UTC).

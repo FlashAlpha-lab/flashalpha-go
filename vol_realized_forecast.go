@@ -44,6 +44,8 @@ type RealizedVolEstimators struct {
 
 // RealizedVolatilityResponse is the body of GET /v1/volatility/realized/{symbol}.
 type RealizedVolatilityResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol          string                `json:"symbol"`
 	AsOf            string                `json:"as_of"`
 	UnderlyingPrice *float64              `json:"underlying_price"`
@@ -144,6 +146,8 @@ type VolatilityForecastGarch struct {
 
 // VolatilityForecastResponse is the body of GET /v1/volatility/forecast/{symbol}.
 type VolatilityForecastResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol string                  `json:"symbol"`
 	AsOf   string                  `json:"as_of"`
 	Ewma   VolatilityForecastEwma  `json:"ewma"`

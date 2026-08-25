@@ -25,6 +25,8 @@ package flashalpha
 
 // VolatilityResponse is the typed body of GET /v1/volatility/{symbol}.
 type VolatilityResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// UnderlyingPrice is the spot mid at AsOf.

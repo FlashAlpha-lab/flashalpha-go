@@ -10,6 +10,8 @@ package flashalpha
 
 // AccountResponse is the typed body of GET /v1/account.
 type AccountResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// UserID is the account's unique identifier (GUID).
 	UserID string `json:"user_id"`
 	// Email is the user's registered email address.

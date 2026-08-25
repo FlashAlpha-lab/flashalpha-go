@@ -725,6 +725,8 @@ type ScreenerField struct {
 
 // ScreenerFieldsResponse is the typed body of GET /v1/screener/fields.
 type ScreenerFieldsResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Fields []ScreenerField `json:"fields"`
 	Count  int             `json:"count"`
 }
@@ -858,6 +860,8 @@ type VrpMacro struct {
 //
 // Raw holds the underlying decoded JSON for any field not modeled above.
 type VrpResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol           string                 `json:"symbol"`
 	UnderlyingPrice  float64                `json:"underlying_price"`
 	AsOf             string                 `json:"as_of"`

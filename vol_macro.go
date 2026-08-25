@@ -38,6 +38,8 @@ type LiquidityExpiry struct {
 
 // LiquidityResponse is the body of GET /v1/liquidity/{symbol}.
 type LiquidityResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol              string            `json:"symbol"`
 	UnderlyingPrice     *float64          `json:"underlying_price"`
 	AsOf                string            `json:"as_of"`
@@ -86,6 +88,8 @@ type SkewTermExpiry struct {
 
 // SkewTermResponse is the body of GET /v1/volatility/skew-term/{symbol}.
 type SkewTermResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol          string           `json:"symbol"`
 	UnderlyingPrice *float64         `json:"underlying_price"`
 	AsOf            string           `json:"as_of"`
@@ -117,6 +121,8 @@ func (c *Client) SkewTermTyped(ctx context.Context, symbol string) (*SkewTermRes
 // SpotVolCorrelationResponse is the body of
 // GET /v1/volatility/spot-vol-correlation/{symbol}.
 type SpotVolCorrelationResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol                string   `json:"symbol"`
 	AsOf                  string   `json:"as_of"`
 	SpotVolCorrelation20d *float64 `json:"spot_vol_correlation_20d"`
@@ -158,6 +164,8 @@ type DispersionContributor struct {
 
 // DispersionResponse is the body of GET /v1/dispersion.
 type DispersionResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	AsOf                string                  `json:"as_of"`
 	Index               string                  `json:"index"`
 	ConstituentCount    int                     `json:"constituent_count"`
@@ -229,6 +237,8 @@ func (c *Client) DispersionTyped(ctx context.Context, index, symbols string, opt
 
 // VixStateResponse is the body of GET /v1/macro/vix-state.
 type VixStateResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	AsOf     string   `json:"as_of"`
 	Vix      *float64 `json:"vix"`
 	SpxRv20d *float64 `json:"spx_rv_20d"`
@@ -269,6 +279,8 @@ type UniverseSymbol struct {
 
 // UniverseResponse is the body of GET /v1/universe.
 type UniverseResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	AsOf     string           `json:"as_of"`
 	Count    int              `json:"count"`
 	Returned int              `json:"returned"`
@@ -344,6 +356,8 @@ type SviSlice struct {
 
 // SurfaceSviResponse is the body of GET /v1/surface/svi/{symbol}.
 type SurfaceSviResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol          string     `json:"symbol"`
 	UnderlyingPrice *float64   `json:"underlying_price"`
 	AsOf            string     `json:"as_of"`
@@ -388,6 +402,8 @@ type ExpectedMoveExpiry struct {
 
 // ExpectedMoveResponse is the body of GET /v1/expected-move/{symbol}.
 type ExpectedMoveResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol          string               `json:"symbol"`
 	UnderlyingPrice *float64             `json:"underlying_price"`
 	AsOf            string               `json:"as_of"`
@@ -451,6 +467,8 @@ type VrpHistoryPoint struct {
 
 // VrpHistoryResponse is the body of GET /v1/vrp/{symbol}/history.
 type VrpHistoryResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol     string            `json:"symbol"`
 	Days       int               `json:"days"`
 	DataPoints int               `json:"data_points"`
