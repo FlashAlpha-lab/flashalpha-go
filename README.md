@@ -90,7 +90,7 @@ delivered to the node that answered, plus `endpoint_version` identifying the dep
 that produced it.
 
 ```go
-gex, err := client.Gex(ctx, "SPY")
+gex, err := client.GexTyped(ctx, "SPY")
 
 *gex.DataAsOf.EquityOptionsFeed // "2026-08-25T18:48:58.204Z"
 *gex.DataAsOf.OiFeed            // "2026-08-22T20:00:00.000Z"  prior session's close
