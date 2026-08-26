@@ -70,6 +70,30 @@ func (c *Client) get(ctx context.Context, path string, params url.Values) (map[s
 	return c.handle(resp)
 }
 
+// getRaw is get, but it preserves the body's shape and returns the response headers.
+// Array-bodied endpoints carry their envelope in headers, so both are needed together.
+func (c *Client) getRaw(ctx context.Context, path string, params url.Values) (json.RawMessage, http.Header, error) {
+	rawURL := c.baseURL + path
+	if len(params) > 0 {
+		rawURL += "?" + params.Encode()
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("flashalpha: build request: %w", err)
+	}
+	req.Header.Set("X-Api-Key", c.apiKey)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("flashalpha: request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	return c.handleRaw(resp)
+}
+
 func (c *Client) post(ctx context.Context, path string, body interface{}) (map[string]interface{}, error) {
 	var reader io.Reader
 	if body != nil {
@@ -100,22 +124,42 @@ func (c *Client) post(ctx context.Context, path string, body interface{}) (map[s
 	return c.handle(resp)
 }
 
+// handle decodes a successful response into a map. Endpoints that return a bare
+// JSON array decode to an empty map here - see handleRaw for the shape-preserving
+// path used by the typed and metadata-bearing accessors.
 func (c *Client) handle(resp *http.Response) (map[string]interface{}, error) {
+	raw, _, err := c.handleRaw(resp)
+	if err != nil {
+		return nil, err
+	}
+	parsed := make(map[string]interface{})
+	if len(raw) > 0 {
+		_ = json.Unmarshal(raw, &parsed)
+	}
+	return parsed, nil
+}
+
+// handleRaw does the shared status and error handling and returns the body
+// untouched on success.
+//
+// It exists because unmarshalling into map[string]interface{} silently discards a
+// bare JSON array: the error is dropped and the caller receives an empty map that
+// looks like a successful empty result. Callers that must preserve the body's shape,
+// or that need the response headers carrying the envelope for array endpoints, use
+// this instead.
+func (c *Client) handleRaw(resp *http.Response) (json.RawMessage, http.Header, error) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("flashalpha: read body: %w", err)
+		return nil, resp.Header, fmt.Errorf("flashalpha: read body: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		return json.RawMessage(body), resp.Header, nil
 	}
 
 	var parsed map[string]interface{}
 	if len(body) > 0 {
 		_ = json.Unmarshal(body, &parsed)
-	}
-
-	if resp.StatusCode == http.StatusOK {
-		if parsed == nil {
-			parsed = make(map[string]interface{})
-		}
-		return parsed, nil
 	}
 
 	msg := extractMessage(parsed, string(body))
@@ -128,7 +172,7 @@ func (c *Client) handle(resp *http.Response) (map[string]interface{}, error) {
 
 	switch resp.StatusCode {
 	case http.StatusUnauthorized:
-		return nil, &AuthenticationError{APIError: baseErr}
+		return nil, resp.Header, &AuthenticationError{APIError: baseErr}
 	case http.StatusForbidden:
 		te := &TierRestrictedError{APIError: baseErr}
 		if parsed != nil {
@@ -139,9 +183,9 @@ func (c *Client) handle(resp *http.Response) (map[string]interface{}, error) {
 				te.RequiredPlan = v
 			}
 		}
-		return nil, te
+		return nil, resp.Header, te
 	case http.StatusNotFound:
-		return nil, &NotFoundError{APIError: baseErr}
+		return nil, resp.Header, &NotFoundError{APIError: baseErr}
 	case http.StatusTooManyRequests:
 		re := &RateLimitError{APIError: baseErr}
 		if ra := resp.Header.Get("Retry-After"); ra != "" {
@@ -149,12 +193,12 @@ func (c *Client) handle(resp *http.Response) (map[string]interface{}, error) {
 				re.RetryAfter = n
 			}
 		}
-		return nil, re
+		return nil, resp.Header, re
 	default:
 		if resp.StatusCode >= 500 {
-			return nil, &ServerError{APIError: baseErr}
+			return nil, resp.Header, &ServerError{APIError: baseErr}
 		}
-		return nil, baseErr
+		return nil, resp.Header, baseErr
 	}
 }
 

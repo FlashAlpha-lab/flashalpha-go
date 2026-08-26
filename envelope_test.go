@@ -23,7 +23,7 @@ const envelopeBody = `{
     "futures_feed": null,
     "futures_options_feed": null,
     "flow_feed": "2026-08-25T18:48:55.100Z",
-    "oi_feed": "2026-08-22T20:00:00.000Z",
+    "oi_feed": "2026-08-24T20:00:00.000Z",
     "macro_feed": "2026-08-25T18:45:00.000Z"
   }
 }`
@@ -83,7 +83,7 @@ func TestSettledOpenInterestTrailsUnmodified(t *testing.T) {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
-	if got := deref(gex.DataAsOf.OiFeed); got != "2026-08-22T20:00:00.000Z" {
+	if got := deref(gex.DataAsOf.OiFeed); got != "2026-08-24T20:00:00.000Z" {
 		t.Errorf("oi_feed = %q, want the prior session close passed through", got)
 	}
 }
