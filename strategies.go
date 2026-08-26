@@ -62,6 +62,8 @@ type StrategyDataQuality struct {
 // is one of insufficient_data / avoid / neutral / candidate. Gate on
 // DataQuality before trading.
 type StrategyDecisionResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Strategy       string                 `json:"strategy"`
 	Symbol         string                 `json:"symbol"`
 	Timestamp      string                 `json:"timestamp"`

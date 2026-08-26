@@ -14,6 +14,8 @@ package flashalpha
 
 // StockQuoteResponse is the typed body of GET /stockquote/{ticker}.
 type StockQuoteResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Ticker is the equity ticker echoed from the request path.
 	Ticker string `json:"ticker"`
 	// Bid is the current best bid.

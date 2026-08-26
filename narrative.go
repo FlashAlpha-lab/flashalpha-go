@@ -14,6 +14,8 @@ package flashalpha
 
 // NarrativeResponse is the typed body of GET /v1/exposure/narrative/{symbol}.
 type NarrativeResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// UnderlyingPrice is the spot mid in dollars at AsOf.

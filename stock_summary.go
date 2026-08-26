@@ -34,6 +34,8 @@ package flashalpha
 // reference spot is Price.Mid (the NBBO mid). All dollar-denominated fields
 // below are dollarised against that.
 type StockSummaryResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// AsOf is the ET wall-clock timestamp this snapshot was computed for.

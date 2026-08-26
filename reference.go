@@ -14,6 +14,8 @@ package flashalpha
 
 // TickersResponse is the typed body of GET /v1/tickers.
 type TickersResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Tickers is the alphabetised list of all available equity tickers
 	// (Polygon catalog).
 	Tickers []string `json:"tickers"`
@@ -29,6 +31,8 @@ type TickersResponse struct {
 // every 5–10 s). Note is a server-supplied caveat safe to surface verbatim;
 // LastUpdated is the ISO timestamp of the most recent refresh.
 type SymbolsResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbols is the list of symbols with live data in the store.
 	Symbols []string `json:"symbols"`
 	// Count is the number of symbols returned (== len(Symbols)).
@@ -56,6 +60,8 @@ type OptionsExpiration struct {
 // strike grids. ExpirationCount equals len(Expirations); TotalContracts is
 // the sum of len(Expirations[i].Strikes) over all expiries.
 type OptionsResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Symbol is the underlying ticker echoed from the request path.
 	Symbol string `json:"symbol"`
 	// Expirations is the list of expirations with their listed strike grids.

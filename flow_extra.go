@@ -22,6 +22,8 @@ import (
 // FlowDealerPremiumResponse is the body of
 // GET /v1/flow/options/{symbol}/dealer-premium.
 type FlowDealerPremiumResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol             string  `json:"symbol"`
 	AsOf               string  `json:"as_of"`
 	WindowMinutes      int     `json:"window_minutes"`
@@ -82,6 +84,8 @@ type FlowStockBar struct {
 
 // FlowStockBarsResponse is the body of GET /v1/flow/stocks/{symbol}/bars.
 type FlowStockBarsResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol       string         `json:"symbol"`
 	Resolution   string         `json:"resolution"`
 	Minutes      int            `json:"minutes"`
@@ -240,6 +244,8 @@ type FlowDirectionBlock struct {
 // Only the headline + flow_direction fields are modeled; Raw holds the full
 // ZeroDte payload (regime, exposures, pin_risk, hedging, decay, levels, ...).
 type FlowZeroDteSnapshotResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol          string                 `json:"symbol"`
 	UnderlyingPrice *float64               `json:"underlying_price"`
 	AsOf            string                 `json:"as_of"`
@@ -272,6 +278,8 @@ type ZeroDteSeriesBar struct {
 
 // ZeroDteSeriesResponse is the body of GET /v1/flow/zero-dte/series/{symbol}.
 type ZeroDteSeriesResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol     string             `json:"symbol"`
 	Expiration string             `json:"expiration"`
 	AsOf       string             `json:"as_of"`
@@ -317,6 +325,8 @@ type ZeroDteHedgeFlowBar struct {
 
 // ZeroDteHedgeFlowResponse is the body of GET /v1/flow/zero-dte/hedge-flow/{symbol}.
 type ZeroDteHedgeFlowResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol     string                `json:"symbol"`
 	Expiration string                `json:"expiration"`
 	AsOf       string                `json:"as_of"`
@@ -367,6 +377,8 @@ type ZeroDteHeatmapBar struct {
 
 // ZeroDteHeatmapResponse is the body of GET /v1/flow/zero-dte/heatmap/{symbol}.
 type ZeroDteHeatmapResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol          string              `json:"symbol"`
 	UnderlyingPrice *float64            `json:"underlying_price"`
 	Expiration      string              `json:"expiration"`
@@ -427,6 +439,8 @@ type ZeroDteStrikeFlowBar struct {
 
 // ZeroDteStrikeFlowResponse is the body of GET /v1/flow/zero-dte/strike-flow/{symbol}.
 type ZeroDteStrikeFlowResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Symbol          string                 `json:"symbol"`
 	UnderlyingPrice *float64               `json:"underlying_price"`
 	Expiration      string                 `json:"expiration"`
@@ -476,6 +490,8 @@ type ZeroDteLeaderboardEntry struct {
 
 // ZeroDteLeaderboardResponse is the body of GET /v1/flow/zero-dte/leaderboard.
 type ZeroDteLeaderboardResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	Metric     string                    `json:"metric"`
 	N          int                       `json:"n"`
 	AsOf       string                    `json:"as_of"`

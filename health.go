@@ -8,6 +8,8 @@ package flashalpha
 
 // HealthResponse is the typed body of GET /health.
 type HealthResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Status is the literal "ok" on healthy responses.
 	Status string `json:"status"`
 }

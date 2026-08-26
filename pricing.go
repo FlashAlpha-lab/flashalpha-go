@@ -14,6 +14,8 @@ package flashalpha
 
 // PricingGreeksResponse is the typed body of GET /v1/pricing/greeks.
 type PricingGreeksResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Inputs echoes the BSM inputs the server actually used (after applying
 	// defaults for r and q if omitted in the request).
 	Inputs *PricingGreeksInputs `json:"inputs"`
@@ -137,6 +139,8 @@ type PricingIvInputs struct {
 // the decimal vol (0.18 = 18%); ImpliedVolatilityPct is the same number in
 // percent.
 type PricingIvResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Inputs echoes the BSM inputs the server actually used.
 	Inputs *PricingIvInputs `json:"inputs"`
 	// ImpliedVolatility is the annualised implied vol as a decimal
@@ -228,6 +232,8 @@ type PricingKellyAnalysis struct {
 // risk-neutral measure. On negative-EV setups Sizing fields are all zero and
 // Recommendation explains the no-position outcome.
 type PricingKellyResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Inputs echoes the inputs the server actually used.
 	Inputs *PricingKellyInputs `json:"inputs"`
 	// Sizing is the Kelly-fraction block (full / half / quarter).

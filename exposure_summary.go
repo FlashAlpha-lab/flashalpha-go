@@ -15,6 +15,8 @@ package flashalpha
 // the entire chain, the gamma-flip strike, the dealer hedging-flow estimate
 // at +/- 1% spot moves, verbal regime narratives, and a 0DTE attribution.
 type ExposureSummaryResponse struct {
+	// ResponseEnvelope carries data_as_of and endpoint_version.
+	ResponseEnvelope
 	// Underlying symbol echoed from the request path (e.g. "SPY").
 	Symbol string `json:"symbol"`
 	// Current spot mid in dollars. The reference price for all GEX/DEX/VEX/CHEX dollarisation.
