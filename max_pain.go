@@ -116,6 +116,10 @@ type MaxPainDealerAlignment struct {
 	Description *string `json:"description"`
 	// Strike where net dealer gamma crosses zero.
 	GammaFlip *float64 `json:"gamma_flip"`
+	// GammaFlipStatus reads "available" when a flip level is published,
+	// otherwise a reason code for why it was withheld (e.g. "no_boundary",
+	// "insufficient_local_coverage"). Treat unknown values as unavailable.
+	GammaFlipStatus *string `json:"gamma_flip_status"`
 	// Strike with highest absolute call GEX (dealer-side resistance).
 	CallWall *float64 `json:"call_wall"`
 	// Strike with highest absolute put GEX (dealer-side support).

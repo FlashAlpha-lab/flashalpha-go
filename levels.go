@@ -30,6 +30,10 @@ type LevelsBlock struct {
 	// single most-watched intraday level — spot crossing the flip flips the
 	// dealer hedging regime (positive ↔ negative gamma).
 	GammaFlip *float64 `json:"gamma_flip"`
+	// GammaFlipStatus reads "available" when a flip level is published,
+	// otherwise a reason code for why it was withheld (e.g. "no_boundary",
+	// "insufficient_local_coverage"). Treat unknown values as unavailable.
+	GammaFlipStatus *string `json:"gamma_flip_status"`
 	// MaxPositiveGamma is the strike with the largest positive net GEX —
 	// typically the most call-heavy strike and a magnet for spot in
 	// positive-gamma regimes.
