@@ -817,10 +817,11 @@ type VrpVannaConditioned struct {
 // VrpRegime is the regime snapshot under response.regime. NetGex and
 // GammaFlip live HERE — not at the top level (a customer trap).
 type VrpRegime struct {
-	Gamma     string   `json:"gamma"`
-	VrpRegime *string  `json:"vrp_regime"`
-	NetGex    float64  `json:"net_gex"`
-	GammaFlip *float64 `json:"gamma_flip"`
+	Gamma           string   `json:"gamma"`
+	VrpRegime       *string  `json:"vrp_regime"`
+	NetGex          float64  `json:"net_gex"`
+	GammaFlip       *float64 `json:"gamma_flip"`
+	GammaFlipStatus *string  `json:"gamma_flip_status"`
 }
 
 // VrpStrategyScores holds 0–100 scores per strategy under

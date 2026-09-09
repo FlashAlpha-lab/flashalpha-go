@@ -263,6 +263,7 @@ type ZeroDteSeriesBar struct {
 	NetGex                  *float64 `json:"net_gex"`
 	NetDex                  *float64 `json:"net_dex"`
 	GammaFlip               *float64 `json:"gamma_flip"`
+	GammaFlipStatus         *string  `json:"gamma_flip_status"`
 	CallWall                *float64 `json:"call_wall"`
 	PutWall                 *float64 `json:"put_wall"`
 	Magnet                  *float64 `json:"magnet"`

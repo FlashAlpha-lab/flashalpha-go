@@ -323,6 +323,7 @@ func (c *Client) EarningsVrpTyped(ctx context.Context, symbol string) (*Earnings
 // EarningsDealerLevels holds the event-week dealer levels.
 type EarningsDealerLevels struct {
 	GammaFlip       *float64 `json:"gamma_flip"`
+	GammaFlipStatus *string  `json:"gamma_flip_status"`
 	CallWall        *float64 `json:"call_wall"`
 	PutWall         *float64 `json:"put_wall"`
 	HighestOiStrike *float64 `json:"highest_oi_strike"`

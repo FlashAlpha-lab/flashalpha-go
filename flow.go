@@ -129,6 +129,11 @@ type FlowLevelsResponse struct {
 	Expiry *string `json:"expiry"`
 	// LiveGammaFlip is the spot where live net dealer gamma crosses zero.
 	LiveGammaFlip *float64 `json:"live_gamma_flip"`
+	// GammaFlipStatus reads "available" when a flip level is published,
+	// otherwise a reason code for why it was withheld (e.g. "no_boundary",
+	// "insufficient_local_coverage"). Treat unknown values as unavailable.
+	// Named gamma_flip_status on the wire, not live_gamma_flip_status.
+	GammaFlipStatus *string `json:"gamma_flip_status"`
 	// LiveCallWall is the strike of the largest live call-gamma
 	// concentration (upside magnet).
 	LiveCallWall *float64 `json:"live_call_wall"`
@@ -265,6 +270,11 @@ type FlowGexResponse struct {
 	LiveNetGexLabel string `json:"live_net_gex_label"`
 	// LiveGammaFlip is the live gamma-flip spot, or nil if no sign change.
 	LiveGammaFlip *float64 `json:"live_gamma_flip"`
+	// GammaFlipStatus reads "available" when a flip level is published,
+	// otherwise a reason code for why it was withheld (e.g. "no_boundary",
+	// "insufficient_local_coverage"). Treat unknown values as unavailable.
+	// Named gamma_flip_status on the wire, not live_gamma_flip_status.
+	GammaFlipStatus *string `json:"gamma_flip_status"`
 	// Strikes is the per-strike breakdown (identical schema to settled GEX).
 	Strikes []GexStrike `json:"strikes"`
 }
@@ -395,6 +405,11 @@ type FlowLiveResponse struct {
 	LiveGexDelta *float64 `json:"live_gex_delta"`
 	// LiveGammaFlip is the live gamma-flip spot, or nil.
 	LiveGammaFlip *float64 `json:"live_gamma_flip"`
+	// GammaFlipStatus reads "available" when a flip level is published,
+	// otherwise a reason code for why it was withheld (e.g. "no_boundary",
+	// "insufficient_local_coverage"). Treat unknown values as unavailable.
+	// Named gamma_flip_status on the wire, not live_gamma_flip_status.
+	GammaFlipStatus *string `json:"gamma_flip_status"`
 	// LiveCallWall is the live call wall strike, or nil.
 	LiveCallWall *float64 `json:"live_call_wall"`
 	// LivePutWall is the live put wall strike, or nil.
@@ -915,6 +930,10 @@ type FlowSignalsChain struct {
 	// GammaFlip is the settled gamma-flip strike (sign change of net
 	// GEX across the chain).
 	GammaFlip *float64 `json:"gamma_flip"`
+	// GammaFlipStatus reads "available" when a flip level is published,
+	// otherwise a reason code for why it was withheld (e.g. "no_boundary",
+	// "insufficient_local_coverage"). Treat unknown values as unavailable.
+	GammaFlipStatus *string `json:"gamma_flip_status"`
 }
 
 // FlowSignalScoreBreakdown is the component contributions that sum to the
