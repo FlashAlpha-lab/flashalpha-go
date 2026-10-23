@@ -1,5 +1,10 @@
 package flashalpha
 
+import (
+	"encoding/json"
+	"net/http"
+)
+
 // DataAsOf reports when each upstream feed last delivered to the node that served
 // the response.
 //
@@ -61,4 +66,30 @@ type ResponseEnvelope struct {
 	EndpointVersion string `json:"endpoint_version,omitempty"`
 	// DataAsOf is the per-feed freshness of the data behind this response.
 	DataAsOf *DataAsOf `json:"data_as_of,omitempty"`
+}
+
+// ResponseMeta is the envelope for endpoints that return a bare JSON array.
+//
+// Those responses have nowhere to put an envelope in the body, so the API sends it in
+// the X-Data-As-Of and X-Endpoint-Version headers instead. The *WithMetadata accessors
+// return this alongside the decoded body so provenance is reachable there too.
+type ResponseMeta struct {
+	// EndpointVersion identifies the deployment that produced the response.
+	EndpointVersion string
+	// DataAsOf is the per-feed freshness, or nil if the header was absent.
+	DataAsOf *DataAsOf
+}
+
+// parseMeta reads the envelope headers. A malformed or absent X-Data-As-Of leaves
+// DataAsOf nil rather than failing the call: provenance is diagnostic, and losing it
+// should never turn a good response into an error.
+func parseMeta(h http.Header) ResponseMeta {
+	m := ResponseMeta{EndpointVersion: h.Get("X-Endpoint-Version")}
+	if raw := h.Get("X-Data-As-Of"); raw != "" {
+		var d DataAsOf
+		if err := json.Unmarshal([]byte(raw), &d); err == nil {
+			m.DataAsOf = &d
+		}
+	}
+	return m
 }

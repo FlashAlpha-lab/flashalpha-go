@@ -87,8 +87,8 @@ func main() {
 
 Every successful JSON-object response carries `data_as_of`, reporting when each upstream
 feed last delivered to the node that answered, plus `endpoint_version` identifying the
-deployment that produced it. That is every method on this client except the handful that
-return a bare JSON array - see the note at the end of this section.
+deployment that produced it. The handful of endpoints that return a bare JSON array carry
+it in response headers instead - see the note at the end of this section.
 
 ```go
 gex, err := client.GexTyped(ctx, "SPY")
@@ -139,9 +139,23 @@ fields are `*string`, so a feed the node has not seen is `nil` rather than `""`.
 
 A few endpoints return a bare JSON array, which has nowhere to put an envelope in the
 body. The API sends the same information in the `X-Data-As-Of` and `X-Endpoint-Version`
-response headers instead - but this client returns the parsed body only and does not
-surface response headers, so the envelope is **not reachable through those methods**.
-Call the HTTP endpoint directly if you need provenance for one of them.
+response headers instead, and the `*WithMetadata` accessors return both together:
+
+```go
+quotes, meta, err := client.OptionQuoteWithMetadata(ctx, "SPY")
+
+len(quotes)                          // 6407 - the whole chain
+meta.DataAsOf.EquityOptionsFeed      // provenance, read from the response headers
+meta.EndpointVersion
+```
+
+`OptionQuoteTyped` decodes the same rows without the envelope. The untyped
+`OptionQuote` returns `map[string]interface{}`, which cannot represent an array, so
+prefer either of the two above for this endpoint.
+
+A malformed or absent `X-Data-As-Of` leaves `meta.DataAsOf` nil rather than failing the
+call - provenance is diagnostic, and losing it should not turn a good response into an
+error.
 
 Full reference: <https://flashalpha.com/docs/lab-api-overview#response-envelope> and the
 methodology whitepaper at <https://flashalpha.com/methodology#freshness-reporting>.

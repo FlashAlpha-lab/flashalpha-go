@@ -3,6 +3,32 @@
 All notable changes to `flashalpha-go` are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-08-26
+
+### Fixed
+- **Bare-array endpoints no longer lose their rows.** `handle` unmarshalled every body
+  into `map[string]interface{}`, which cannot represent a JSON array: the error was
+  discarded and callers received an empty map that looked like a successful empty
+  result. `OptionQuoteTyped` then re-encoded that empty map and returned a single
+  zero-valued quote. It now decodes from the raw body and returns the whole chain -
+  6,407 quotes on a live unfiltered SPY call, against 1 empty quote before.
+
+### Added
+- **`OptionQuoteWithMetadata`** returns the quotes together with a `ResponseMeta`
+  carrying `EndpointVersion` and `DataAsOf`. Array bodies have nowhere to hold an
+  envelope, so the API sends provenance in the `X-Data-As-Of` and `X-Endpoint-Version`
+  headers; this is the only way to reach it for such an endpoint.
+- `ResponseMeta` and header parsing. A malformed or absent header leaves `DataAsOf` nil
+  rather than failing the call - provenance is diagnostic, and losing it should never
+  turn a good response into an error.
+
+### Notes
+- `handle` now delegates to a new `handleRaw`, so every status and error branch stays in
+  one place and behaviour for object-bodied endpoints is unchanged.
+- The untyped `OptionQuote` still returns `map[string]interface{}` and so still cannot
+  represent an array; it is left alone for compatibility and the README points at the
+  two accessors that work.
+
 ## [1.3.0] - 2026-08-25
 
 ### Added

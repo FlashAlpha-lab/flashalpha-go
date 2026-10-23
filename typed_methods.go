@@ -9,9 +9,12 @@ package flashalpha
 // unchanged — adding these wrappers is purely additive.
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"strconv"
 )
 
 // decodeTyped re-encodes a map[string]interface{} response and decodes it
@@ -256,32 +259,66 @@ func (c *Client) ChexTyped(ctx context.Context, symbol string, opts ...ChexOptio
 // responses are wrapped into a 1-element slice. Inspect the underlying
 // shape via OptionQuote(...) when you need to distinguish.
 func (c *Client) OptionQuoteTyped(ctx context.Context, ticker string, opts ...OptionQuoteOption) ([]OptionQuote, error) {
-	raw, err := c.OptionQuote(ctx, ticker, opts...)
+	quotes, _, err := c.OptionQuoteWithMetadata(ctx, ticker, opts...)
+	return quotes, err
+}
+
+// OptionQuoteWithMetadata is OptionQuoteTyped plus the response envelope.
+//
+// /optionquote is one of the few endpoints that returns a bare JSON array, so its
+// provenance travels in headers rather than the body. This is the only way to reach
+// it for this endpoint.
+func (c *Client) OptionQuoteWithMetadata(ctx context.Context, ticker string, opts ...OptionQuoteOption) ([]OptionQuote, ResponseMeta, error) {
+	cfg := &optionQuoteConfig{}
+	for _, o := range opts {
+		o(cfg)
+	}
+	params := url.Values{}
+	if cfg.expiry != "" {
+		params.Set("expiry", cfg.expiry)
+	}
+	if cfg.strike != nil {
+		params.Set("strike", strconv.FormatFloat(*cfg.strike, 'f', -1, 64))
+	}
+	if cfg.typ != "" {
+		params.Set("type", cfg.typ)
+	}
+
+	raw, hdr, err := c.getRaw(ctx, "/optionquote/"+seg(ticker), params)
 	if err != nil {
-		return nil, err
+		return nil, ResponseMeta{}, err
 	}
-	// The /optionquote endpoint may return either a list or a single
-	// object. The map[string]interface{} return type from the unwrapped
-	// method already discards the outer-array shape, so re-marshal the
-	// raw payload and try both shapes.
-	if quotes, ok := raw["quotes"]; ok {
-		// Shape: { "quotes": [ ... ] } — some servers wrap.
-		buf, mErr := json.Marshal(quotes)
-		if mErr != nil {
-			return nil, fmt.Errorf("flashalpha: re-encode option quote: %w", mErr)
-		}
+	meta := parseMeta(hdr)
+
+	// Decoded from the raw body rather than from a map, because the unfiltered call
+	// returns a bare array: routing that through map[string]interface{} drops it
+	// entirely and yields one zero-valued quote.
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 {
+		return nil, meta, nil
+	}
+
+	if trimmed[0] == '[' {
 		var out []OptionQuote
-		if err := json.Unmarshal(buf, &out); err != nil {
-			return nil, fmt.Errorf("flashalpha: decode option quote: %w", err)
+		if err := json.Unmarshal(trimmed, &out); err != nil {
+			return nil, meta, fmt.Errorf("flashalpha: decode option quote array: %w", err)
 		}
-		return out, nil
+		return out, meta, nil
 	}
-	// Single-object shape — decode as one OptionQuote and wrap.
-	single := OptionQuote{}
-	if err := decodeTyped("option quote", raw, &single); err != nil {
-		return nil, err
+
+	// Some shapes wrap the list; a filtered call returns one object.
+	var wrapper struct {
+		Quotes []OptionQuote `json:"quotes"`
 	}
-	return []OptionQuote{single}, nil
+	if err := json.Unmarshal(trimmed, &wrapper); err == nil && wrapper.Quotes != nil {
+		return wrapper.Quotes, meta, nil
+	}
+
+	var single OptionQuote
+	if err := json.Unmarshal(trimmed, &single); err != nil {
+		return nil, meta, fmt.Errorf("flashalpha: decode option quote: %w", err)
+	}
+	return []OptionQuote{single}, meta, nil
 }
 
 // StockQuoteTyped is the strongly-typed variant of StockQuote. The original
