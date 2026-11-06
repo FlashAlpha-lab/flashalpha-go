@@ -83,6 +83,43 @@ func main() {
 }
 ```
 
+## sell-window: should you sell options today?
+
+Option sellers get wiped out on a few bad days. sell-window tells you which days to stay out, and on the days it says sell, it hands you the trades: which expiry, which strikes and how to exit. Every session, for SPY, QQQ and IWM. More than 5 million backtests led to this one endpoint.
+
+```go
+client := flashalpha.NewClient("YOUR_API_KEY")
+answer, err := client.SellWindow(ctx, "SPY")
+if err != nil {
+	log.Fatal(err)
+}
+
+for _, window := range answer.Windows {
+	fmt.Println(window.Action) // sell, skip or unavailable
+	for _, trade := range window.Candidates {
+		fmt.Println(" ", trade.Structure, trade.Exit)
+	}
+}
+```
+
+Each of the four windows (the same-day expiry, then the expiries closest to one week, two weeks and one month out) says `sell`, `skip` or `unavailable`. On a sell it lists the trades, with strikes, quotes and the exit rule. On a skip there is nothing to do.
+
+| Backtest, 2018 to 2026 | Following sell-window | Selling the same trades every day |
+|---|---|---|
+| Max drawdown at the same trade size | $255k | $959k |
+| Worst month at the same trade size | -$171k | -$307k |
+| Sharpe ratio | 0.76 | 0.61 |
+| Total P&L at the same max drawdown | $3.55M | $2.32M |
+| Worst day at the same max drawdown | -$258k | -$385k |
+
+Cut the risk or earn more. Keep your trade size and the deepest drawdown falls 73%. Or size up about 3.8 times, until the deepest drawdown matches, and you earn 53% more. These are two separate choices, not one result.
+
+**Plans:** Live answers need Basic or higher through November 2026, and Growth or higher from December 1, 2026. Backtesting any past session needs Alpha or higher. Backtest with [flashalpha-historical-go](https://github.com/FlashAlpha-lab/flashalpha-historical-go).
+
+**Read more:** [API docs](https://flashalpha.com/docs/lab-api-strategies-sell-window?utm_source=github&utm_medium=readme&utm_campaign=repo-flashalpha-go&utm_content=sell-window) | [trading guide](https://flashalpha.com/articles/complete-guide-trading-sell-window-spy-qqq-iwm?utm_source=github&utm_medium=readme&utm_campaign=repo-flashalpha-go&utm_content=sell-window) | [every backtested trade](https://flashalpha.com/articles/sell-window-backtest-every-trade-2018-2026?utm_source=github&utm_medium=readme&utm_campaign=repo-flashalpha-go&utm_content=sell-window) | [sell-window in depth](https://github.com/FlashAlpha-lab/flashalpha-go/blob/main/docs/sell-window.md) | [plans](https://flashalpha.com/pricing?utm_source=github&utm_medium=readme&utm_campaign=repo-flashalpha-go&utm_content=sell-window) | [live forward test on Discord](https://discord.gg/UtH22J8df2)
+
+*Backtest on SPY, QQQ and IWM, January 2018 to October 2026, at halfway fills and $1 per contract. At one contract set per signal, following it made $945,541 on 20,883 trades; selling every day made $2,321,150 on 56,975. At 3.76 times the contracts, both fell $958,924 at their deepest, and the worst month was -$642,135 against -$307,241. Past results do not guarantee future returns, and short options can lose more than the premium collected. The skip call applies to new trades, so it cannot protect open positions from a sudden shock. This is data, not investment advice.*
+
 ## Data provenance: `data_as_of`
 
 Every successful JSON-object response carries `data_as_of`, reporting when each upstream
@@ -289,6 +326,7 @@ structure, risk). Tunable via `WithStrategyExpiry`, `WithStrategyMinOpenInterest
 | `StrategySkew(ctx, symbol, ...)` | Skew steepness / risk-reversal signal | Growth+ |
 | `StrategyTermStructure(ctx, symbol)` | Term-structure (contango/backwardation) signal | Growth+ |
 | `StrategyTailPricing(ctx, symbol, ...)` | Tail / convexity pricing signal | Growth+ |
+| `SellWindow(ctx, symbol)` | sell-window: should you sell options today? Sell or skip per expiry, with the trades to place (SPY, QQQ, IWM). Returns `*SellWindowResponse` | Basic+ through Nov 2026, then Growth+ |
 
 ### Earnings Analytics
 
