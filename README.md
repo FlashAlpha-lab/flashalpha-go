@@ -120,6 +120,47 @@ Cut the risk or earn more. Keep your trade size and the deepest drawdown falls 7
 
 *Backtest on SPY, QQQ and IWM, January 2018 to October 2026, at halfway fills and $1 per contract. At one contract set per signal, following it made $945,541 on 20,883 trades; selling every day made $2,321,150 on 56,975. At 3.76 times the contracts, both fell $958,924 at their deepest, and the worst month was -$642,135 against -$307,241. Past results do not guarantee future returns, and short options can lose more than the premium collected. The skip call applies to new trades, so it cannot protect open positions from a sudden shock. This is data, not investment advice.*
 
+## Expiry impact and strike dependency (SPY, QQQ)
+
+Two Growth+ views of how much of the current gamma concentration rests on one expiry.
+
+- **Expiry impact** compares the current SPY or QQQ gamma distribution with the same
+  captured inputs after excluding one expiry. Spot, Greeks and open interest are held
+  fixed, so it measures how much of today's concentration depends on one maturity. It is
+  not a forecast of post-expiry prices, dealer hedging or the next session's chain.
+- **Strike dependency** attributes the gamma at one exact observed strike to its
+  expiries, and names the dominant expiry. It reports concentration at that strike, not
+  a support/resistance probability.
+
+```go
+client := flashalpha.NewClient("YOUR_API_KEY")
+
+// Exclude the nearest active expiry (or pick one with WithExpiryImpactExpiry).
+impact, err := client.ExpiryImpact(ctx, "SPY", flashalpha.WithExpiryImpactLimit(5))
+if err != nil {
+	log.Fatal(err)
+}
+im := impact.Impact
+if im.RemovedGrossSharePct != nil && im.NetSignChanged != nil {
+	fmt.Printf("%s holds %.1f%% of gross gamma; net sign changes without it: %v\n",
+		impact.SelectedExpiry, *im.RemovedGrossSharePct, *im.NetSignChanged)
+}
+
+// The strike must be listed exactly; it is never snapped to a nearby strike.
+level, err := client.StrikeDependency(ctx, "SPY", 670)
+if err != nil {
+	log.Fatal(err)
+}
+if level.DominantExpiry != nil && level.DominantExpirySharePct != nil {
+	fmt.Printf("670: %s holds %.1f%% of the gamma at this strike\n",
+		*level.DominantExpiry, *level.DominantExpirySharePct)
+}
+```
+
+`data_status` is `partial` in normal operation (the open-interest vintage is unknown),
+`stale` when an input predates the market-session freshness cutoff, and `unavailable`
+when no contract qualifies. `reasons` carries machine codes.
+
 ## Data provenance: `data_as_of`
 
 Every successful JSON-object response carries `data_as_of`, reporting when each upstream
@@ -259,6 +300,8 @@ All methods take `context.Context` as the first argument and return
 | `ExposureTermStructure(ctx, symbol)` | Dealer exposure bucketed by DTE — gamma/vanna/charm term structure | Growth+ |
 | `ExposureBasket(ctx, symbols, ...BasketOption)` | Aggregate dealer exposure across a custom basket (`WithBasketWeights`) | Growth+ |
 | `ExposureOiDiff(ctx, symbol, ...OiDiffOption)` | Day-over-day open-interest change by strike, top movers (`WithOiDiffTopN`) | Growth+ |
+| `ExpiryImpact(ctx, symbol, ...ExpiryImpactOption)` | Compares the current SPY or QQQ gamma distribution with the same captured inputs after excluding one expiry (`WithExpiryImpactExpiry`, `WithExpiryImpactLimit`). Returns `*ExpiryImpactResponse` | Growth+ |
+| `StrikeDependency(ctx, symbol, strike)` | Attributes the gamma at one exact observed SPY or QQQ strike to its expiries: does the level depend on a single maturity? Returns `*StrikeDependencyResponse` | Growth+ |
 
 ### Flow (live, simulation-aware) — Growth+ (raw tape, unusual-flow signals, OI simulator state & the full live bundle are Alpha)
 
