@@ -9,7 +9,7 @@ package flashalpha
 // JSON blob per symbol is more useful than five.
 //
 // Class-level: dual mode — authenticated requests return a LIVE snapshot;
-// unauthenticated requests return the previous-day cached snapshot. The
+// unauthenticated requests return the previous trading session's snapshot. The
 // payload shape is identical in both modes.
 //
 // Nullability conventions:
@@ -41,8 +41,8 @@ type StockSummaryResponse struct {
 	// AsOf is the ET wall-clock timestamp this snapshot was computed for.
 	AsOf string `json:"as_of"`
 	// MarketOpen is true if NYSE was open at AsOf. False overnight, weekends,
-	// and holidays — when MarketOpen=false the response is a previous-day
-	// cached snapshot.
+	// and holidays — when MarketOpen=false the response is a previous-session
+	// snapshot.
 	MarketOpen bool `json:"market_open"`
 	// Price is the bid/ask/mid/last quote block. See StockSummaryPrice.
 	Price *StockSummaryPrice `json:"price"`

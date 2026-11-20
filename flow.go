@@ -782,7 +782,7 @@ type FlowOptionLeaderRow struct {
 type FlowOptionLeaderboardResponse struct {
 	// ResponseEnvelope carries data_as_of and endpoint_version.
 	ResponseEnvelope
-	// GeneratedUtc is when the cached snapshot was generated (ISO-8601 UTC).
+	// GeneratedUtc is when the snapshot was generated (ISO-8601 UTC).
 	GeneratedUtc string `json:"generatedUtc"`
 	// N is the number of ranked rows requested per side.
 	N *int `json:"n"`
@@ -837,7 +837,7 @@ type FlowOutlierRow struct {
 type FlowOptionOutliersResponse struct {
 	// ResponseEnvelope carries data_as_of and endpoint_version.
 	ResponseEnvelope
-	// GeneratedUtc is when the cached snapshot was generated (ISO-8601 UTC).
+	// GeneratedUtc is when the snapshot was generated (ISO-8601 UTC).
 	GeneratedUtc string `json:"generatedUtc"`
 	// WindowMinutes is the aggregation window in minutes.
 	WindowMinutes *int `json:"windowMinutes"`
@@ -877,7 +877,7 @@ type FlowStockLeaderRow struct {
 type FlowStockLeaderboardResponse struct {
 	// ResponseEnvelope carries data_as_of and endpoint_version.
 	ResponseEnvelope
-	// GeneratedUtc is when the cached snapshot was generated (ISO-8601 UTC).
+	// GeneratedUtc is when the snapshot was generated (ISO-8601 UTC).
 	GeneratedUtc string `json:"generatedUtc"`
 	// N is the number of ranked rows requested per side.
 	N *int `json:"n"`
@@ -894,7 +894,7 @@ type FlowStockLeaderboardResponse struct {
 type FlowStockOutliersResponse struct {
 	// ResponseEnvelope carries data_as_of and endpoint_version.
 	ResponseEnvelope
-	// GeneratedUtc is when the cached snapshot was generated (ISO-8601 UTC).
+	// GeneratedUtc is when the snapshot was generated (ISO-8601 UTC).
 	GeneratedUtc string `json:"generatedUtc"`
 	// WindowMinutes is the aggregation window in minutes.
 	WindowMinutes *int `json:"windowMinutes"`
