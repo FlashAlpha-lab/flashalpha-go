@@ -614,6 +614,7 @@ MIT. See [LICENSE](LICENSE).
 - [API Documentation](https://flashalpha.com/docs)
 - [Examples](https://github.com/FlashAlpha-lab/flashalpha-examples) — runnable tutorials
 - [GEX Explained](https://github.com/FlashAlpha-lab/gex-explained) — gamma exposure theory and code
+- [TradingView GEX by FlashAlpha](https://github.com/FlashAlpha-lab/tradingview-gex-flashalpha) - call wall, put wall, gamma flip and max pain on a live candlestick chart
 - [0DTE Options Analytics](https://github.com/FlashAlpha-lab/0dte-options-analytics) — 0DTE pin risk, expected move, dealer hedging
 - [Volatility Surface Python](https://github.com/FlashAlpha-lab/volatility-surface-python) — SVI calibration, variance swap, skew analysis
 - [Awesome Options Analytics](https://github.com/FlashAlpha-lab/awesome-options-analytics) — curated resource list
